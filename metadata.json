@@ -1,0 +1,6 @@
+{
+  "name": "SpaceTime.",
+  "description": "A futuristic, minimal, highly immersive Pomodoro productivity ecosystem.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
