@@ -1,5 +1,10 @@
 package com.example.ui.screens
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,7 +30,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.RoomEntity
 import com.example.data.TimeBlockEntity
 import com.example.viewmodel.SpaceTimeViewModel
-import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 
 @Composable
@@ -38,8 +42,8 @@ fun RoomScreen(
     val timeBlocks by viewModel.getTimeBlocks(roomId).collectAsStateWithLifecycle(initialValue = emptyList())
 
     if (room == null) {
-        Box(modifier = Modifier.fillMaxSize().background(SpaceBlack), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = NeonCyan)
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         }
         return
     }
@@ -48,6 +52,21 @@ fun RoomScreen(
     var timeRemainingSecs by remember { mutableStateOf(0) }
     var isTimerRunning by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val notificationHelper = remember { com.example.util.NotificationHelper(context) }
+    
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        // Handle response if needed
+    }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     LaunchedEffect(isTimerRunning, timeRemainingSecs) {
         if (isTimerRunning && timeRemainingSecs > 0) {
             delay(1000L)
@@ -55,7 +74,13 @@ fun RoomScreen(
         } else if (isTimerRunning && timeRemainingSecs == 0) {
             isTimerRunning = false
             // Mark block complete if needed
-            activeBlock?.let { viewModel.completeBlock(it) }
+            activeBlock?.let { 
+                viewModel.completeBlock(it) 
+                notificationHelper.showTimerCompleteNotification(
+                    title = "Time's Up!", 
+                    message = "${it.title} is complete."
+                )
+            }
         }
     }
 
@@ -65,13 +90,13 @@ fun RoomScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(SpaceBlack)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
         // Header
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
             }
             Spacer(modifier = Modifier.width(8.dp))
             Text(r.name, style = MaterialTheme.typography.titleLarge, color = roomColor)
@@ -84,7 +109,7 @@ fun RoomScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(0.4f)
-                .background(SpaceSurface, RoundedCornerShape(32.dp)),
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(32.dp)),
             contentAlignment = Alignment.Center
         ) {
             val progress = if (activeBlock == null || timeRemainingSecs == 0) 0f
@@ -106,7 +131,7 @@ fun RoomScreen(
                 Text(
                     text = timeStr,
                     style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp),
-                    color = TextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = activeBlock?.title ?: "Select a Block",
@@ -138,49 +163,99 @@ fun RoomScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-        Text("TIME BLOCKS", style = MaterialTheme.typography.labelLarge, color = TextSecondary, modifier = Modifier.padding(bottom = 8.dp))
+        var selectedTabIndex by remember { mutableStateOf(0) }
 
-        // Time Blocks Timeline
-        LazyColumn(
-            modifier = Modifier.weight(0.6f),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        Spacer(modifier = Modifier.height(24.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(timeBlocks) { block ->
-                val isCompleted = block.isCompleted
-                val isCurrent = activeBlock?.blockId == block.blockId
-                
-                Row(
+            Text(
+                text = if (selectedTabIndex == 0) "TIME BLOCKS" else "ANALYTICS", 
+                style = MaterialTheme.typography.labelLarge, 
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
+            Row(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                    .padding(4.dp)
+            ) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .background(if (isCurrent) SpaceSurfaceVariant else SpaceSurface, RoundedCornerShape(16.dp))
-                        .clickable {
-                            activeBlock = block
-                            timeRemainingSecs = block.durationMin * 60
-                            isTimerRunning = false
-                        }
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (selectedTabIndex == 0) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+                        .clickable { selectedTabIndex = 0 }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Box(
+                    Text("Tasks", style = MaterialTheme.typography.labelMedium, color = if (selectedTabIndex == 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (selectedTabIndex == 1) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+                        .clickable { selectedTabIndex = 1 }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text("Trends", style = MaterialTheme.typography.labelMedium, color = if (selectedTabIndex == 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (selectedTabIndex == 0) {
+            // Time Blocks Timeline
+            LazyColumn(
+                modifier = Modifier.weight(0.6f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(timeBlocks) { block ->
+                    val isCompleted = block.isCompleted
+                    val isCurrent = activeBlock?.blockId == block.blockId
+                    
+                    Row(
                         modifier = Modifier
-                            .size(24.dp)
-                            .background(
-                                if (isCompleted) roomColor else Color.Transparent, 
-                                CircleShape
-                            )
-                            .padding(2.dp)
+                            .fillMaxWidth()
+                            .background(if (isCurrent) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                            .clickable {
+                                activeBlock = block
+                                timeRemainingSecs = block.durationMin * 60
+                                isTimerRunning = false
+                            }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (isCompleted) {
-                            Icon(Icons.Filled.Check, contentDescription = "Done", tint = SpaceBlack, modifier = Modifier.size(20.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(
+                                    if (isCompleted) roomColor else Color.Transparent, 
+                                    CircleShape
+                                )
+                                .padding(2.dp)
+                        ) {
+                            if (isCompleted) {
+                                Icon(Icons.Filled.Check, contentDescription = "Done", tint = MaterialTheme.colorScheme.background, modifier = Modifier.size(20.dp))
+                            }
                         }
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(block.title, style = MaterialTheme.typography.bodyLarge, color = if (isCompleted) TextSecondary else TextPrimary)
-                        Text("${block.durationMin} mins", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(block.title, style = MaterialTheme.typography.bodyLarge, color = if (isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                            Text("${block.durationMin} mins", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
+            }
+        } else {
+            // Analytics View
+            Box(modifier = Modifier.weight(0.6f)) {
+                com.example.ui.components.ProductivityChart(
+                    roomColor = roomColor,
+                    totalSessions = r.totalSessionsCompleted,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }

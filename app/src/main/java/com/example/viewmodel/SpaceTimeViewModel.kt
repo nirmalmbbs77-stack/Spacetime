@@ -19,6 +19,12 @@ import android.graphics.Color
 
 class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewModel() {
     
+    val isDarkMode = MutableStateFlow(true)
+
+    fun toggleTheme() {
+        isDarkMode.value = !isDarkMode.value
+    }
+
     val rooms = repository.allRooms.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -27,6 +33,18 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
 
     val isGenerating = MutableStateFlow(false)
     val errorMessage = MutableStateFlow<String?>(null)
+
+    fun createManualRoom(name: String, colorArgb: Long, iconName: String = "Star") {
+        viewModelScope.launch(Dispatchers.IO) {
+            val newRoom = RoomEntity(
+                name = name,
+                colorArgb = colorArgb,
+                iconName = iconName,
+                totalSessionsCompleted = 0
+            )
+            repository.insertRoom(newRoom)
+        }
+    }
 
     fun getRoom(id: Int) = repository.getRoomById(id)
     fun getTimeBlocks(id: Int) = repository.getTimeBlocksForRoom(id)
@@ -37,46 +55,50 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
             errorMessage.value = null
             try {
                 val apiKey = BuildConfig.GEMINI_API_KEY
-                val schemaStr = """
-                {
-                  "type": "OBJECT",
-                  "properties": {
-                    "roomName": { "type": "STRING", "description": "Creative, short room name. Eg. Space Revision" },
-                    "colorHex": { "type": "STRING", "description": "Neon 6-char hex color, no hash. Eg. 00FFCC or A200FF" },
-                    "blocks": {
-                      "type": "ARRAY",
-                      "items": {
-                        "type": "OBJECT",
-                        "properties": {
-                          "title": { "type": "STRING", "description": "Task or break name" },
-                          "durationMin": { "type": "INTEGER", "description": "Duration in minutes" }
-                        }
-                      }
-                    }
-                  }
-                }
-                """.trimIndent()
                 
-                val schemaObj = Json.parseToJsonElement(schemaStr).jsonObject
+                val promptText = """
+                    Generate a productivity pomodoro schedule based on: $prompt.
+                    Return ONLY valid JSON in this exact format:
+                    {
+                      "roomName": "Creative short name",
+                      "colorHex": "A200FF or 00FFCC (no hash)",
+                      "blocks": [
+                        { "title": "Focus Session", "durationMin": 45 },
+                        { "title": "Short Break", "durationMin": 10 }
+                      ]
+                    }
+                    Do not add markdown formatting, backticks, or any other text.
+                """.trimIndent()
 
                 val request = GenerateContentRequest(
-                    contents = listOf(Content(parts = listOf(Part(text = "Generate a productivity pomodoro schedule based on: " + prompt)))),
-                    systemInstruction = Content(parts = listOf(Part(text = "You are an AI for a futuristic space-themed pomodoro app. Parse user prompts into strict JSON schedules. Colors should be neon and vibrant."))),
+                    contents = listOf(Content(parts = listOf(Part(text = promptText)))),
+                    systemInstruction = Content(parts = listOf(Part(text = "You are an AI for a futuristic space-themed pomodoro app. Output strictly standard JSON."))),
                     generationConfig = GenerationConfig(
                         temperature = 0.5f,
                         responseFormat = ResponseFormat(
                             text = ResponseFormatText(
-                                mimeType = "application/json",
-                                schema = schemaObj
+                                mimeType = "application/json"
                             )
                         )
                     )
                 )
 
                 val response = RetrofitClient.service.generateContent(apiKey, request)
-                val responseText = response.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
+                var responseText = response.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
                 
                 if (responseText != null) {
+                    responseText = responseText.trim()
+                    if (responseText.startsWith("```json")) {
+                        responseText = responseText.substringAfter("```json")
+                    }
+                    if (responseText.startsWith("```")) {
+                        responseText = responseText.substringAfter("```")
+                    }
+                    if (responseText.endsWith("```")) {
+                        responseText = responseText.substringBeforeLast("```")
+                    }
+                    responseText = responseText.trim()
+
                     val jsonObj = Json.parseToJsonElement(responseText).jsonObject
                     val roomName = jsonObj["roomName"]?.jsonPrimitive?.content ?: "AI Room"
                     val colorHex = jsonObj["colorHex"]?.jsonPrimitive?.content ?: "00FFCC"
@@ -110,6 +132,9 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
                 } else {
                     errorMessage.value = "Failed to parse AI response."
                 }
+            } catch (e: retrofit2.HttpException) {
+                val errorBody = e.response()?.errorBody()?.string() ?: ""
+                errorMessage.value = "HTTP ${e.code()}: $errorBody"
             } catch (e: Exception) {
                 errorMessage.value = "Error generating schedule: ${e.message}"
             } finally {

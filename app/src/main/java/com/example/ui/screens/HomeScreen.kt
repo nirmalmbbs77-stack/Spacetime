@@ -9,25 +9,27 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.RoomEntity
 import com.example.viewmodel.SpaceTimeViewModel
-import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.SpaceBlack
-import com.example.ui.theme.SpaceSurface
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,26 +39,45 @@ fun HomeScreen(
 ) {
     val rooms by viewModel.rooms.collectAsStateWithLifecycle()
     val isGenerating by viewModel.isGenerating.collectAsStateWithLifecycle()
+    val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
+    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     var promptText by remember { mutableStateOf("") }
 
-    Box(modifier = Modifier.fillMaxSize().background(SpaceBlack)) {
+    var showCreateRoomDialog by remember { mutableStateOf(false) }
+    var newRoomName by remember { mutableStateOf("") }
+    val colors = listOf(Color(0xFF00FFCC), Color(0xFFA200FF), Color(0xFFFF0080), Color(0xFFFFB800), Color(0xFF00E5FF))
+    var selectedColor by remember { mutableStateOf(colors[0]) }
+
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            Text(
-                text = "SpaceTime.",
-                style = MaterialTheme.typography.displayMedium,
-                color = TextPrimary,
-                modifier = Modifier.padding(vertical = 24.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "SpaceTime.",
+                    style = MaterialTheme.typography.displayMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                IconButton(onClick = { viewModel.toggleTheme() }) {
+                    Icon(
+                        imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode,
+                        contentDescription = "Toggle Theme",
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+            }
 
             if (rooms.isEmpty()) {
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     Text(
                         "No rooms yet.\nGenerate one below.",
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
@@ -76,9 +97,17 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage!!,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+            }
+
             // AI Prompt Box
             Card(
-                colors = CardDefaults.cardColors(containerColor = SpaceSurface),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(24.dp)
             ) {
                 Row(
@@ -91,14 +120,14 @@ fun HomeScreen(
                         value = promptText,
                         onValueChange = { promptText = it },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("AI: e.g. Make a 4 hr study room", color = TextSecondary) },
+                        placeholder = { Text("AI: e.g. Make a 4 hr study room", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent,
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
                         singleLine = true
                     )
@@ -111,16 +140,88 @@ fun HomeScreen(
                             }
                         },
                         modifier = Modifier
-                            .background(Color(0x3300FFCC), shape = RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), shape = RoundedCornerShape(16.dp))
                     ) {
                         if (isGenerating) {
-                            CircularProgressIndicator(color = NeonCyan, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Filled.AutoAwesome, contentDescription = "Generate", tint = NeonCyan)
+                            Icon(Icons.Filled.AutoAwesome, contentDescription = "Generate", tint = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
             }
+        }
+
+        FloatingActionButton(
+            onClick = { showCreateRoomDialog = true },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 100.dp, end = 16.dp),
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = "Create Room")
+        }
+
+        if (showCreateRoomDialog) {
+            AlertDialog(
+                onDismissRequest = { showCreateRoomDialog = false },
+                title = { Text("Create Room") },
+                text = {
+                    Column {
+                        OutlinedTextField(
+                            value = newRoomName,
+                            onValueChange = { newRoomName = it },
+                            label = { Text("Room Name") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Room Color", style = MaterialTheme.typography.labelLarge)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            colors.forEach { color ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(color, androidx.compose.foundation.shape.CircleShape)
+                                        .clickable { selectedColor = color }
+                                        .drawBehind {
+                                            if (selectedColor == color) {
+                                                drawCircle(
+                                                    color = Color.White,
+                                                    radius = size.width / 2 + 4.dp.toPx(),
+                                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                                                )
+                                            }
+                                        }
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (newRoomName.isNotBlank()) {
+                                viewModel.createManualRoom(newRoomName, selectedColor.toArgb().toLong())
+                                showCreateRoomDialog = false
+                                newRoomName = ""
+                            }
+                        }
+                    ) {
+                        Text("Create")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showCreateRoomDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
 }
@@ -128,49 +229,81 @@ fun HomeScreen(
 @Composable
 fun RoomCard(room: RoomEntity, onClick: () -> Unit) {
     val roomColor = Color(room.colorArgb)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    
+    val scale by androidx.compose.animation.core.animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, label = "scale")
+    val glowAlpha by androidx.compose.animation.core.animateFloatAsState(targetValue = if (isPressed) 0.5f else 0.2f, label = "glow")
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(RoundedCornerShape(24.dp))
-            .background(SpaceSurface)
+            .background(MaterialTheme.colorScheme.surface)
             .drawBehind {
                 drawRect(
                     brush = Brush.radialGradient(
-                        colors = listOf(roomColor.copy(alpha = 0.2f), Color.Transparent),
+                        colors = listOf(roomColor.copy(alpha = glowAlpha), roomColor.copy(alpha = 0f)),
                         radius = size.width
                     )
                 )
             }
-            .clickable { onClick() }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
             .padding(16.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(roomColor.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
             ) {
-                Icon(Icons.Filled.AutoAwesome, contentDescription = "Room Icon", tint = roomColor)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(roomColor.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.AutoAwesome, contentDescription = "Room Icon", tint = roomColor)
+                }
+
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(32.dp)) {
+                    val progress = ((room.totalSessionsCompleted % 10) / 10f).coerceAtLeast(0.1f)
+                    CircularProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxSize(),
+                        color = roomColor,
+                        trackColor = roomColor.copy(alpha = 0.2f),
+                        strokeWidth = 3.dp
+                    )
+                }
             }
 
             Column {
                 Text(
                     text = room.name,
                     style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = "${room.totalSessionsCompleted} Sessions",
                     style = MaterialTheme.typography.labelLarge,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
     }
 }
+
