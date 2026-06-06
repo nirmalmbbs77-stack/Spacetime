@@ -144,9 +144,28 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
     }
 
     fun completeBlock(block: TimeBlockEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repository.updateTimeBlock(block.copy(isCompleted = !block.isCompleted))
             // simplistic logic: just toggle
+        }
+    }
+
+    fun addBlock(roomId: Int, title: String, durationMin: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val newBlock = TimeBlockEntity(
+                roomId = roomId,
+                title = title,
+                durationMin = durationMin,
+                // Using current time as a simple way to append to the end of the list
+                orderIndex = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
+            )
+            repository.insertTimeBlock(newBlock)
+        }
+    }
+
+    fun deleteBlock(block: TimeBlockEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.deleteTimeBlockById(block.blockId)
         }
     }
 }

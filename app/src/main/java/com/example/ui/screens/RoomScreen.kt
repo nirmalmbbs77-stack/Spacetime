@@ -17,6 +17,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,7 +52,12 @@ fun RoomScreen(
 
     var activeBlock by remember { mutableStateOf<TimeBlockEntity?>(null) }
     var timeRemainingSecs by remember { mutableStateOf(0) }
+    var maxTimeSecs by remember { mutableStateOf(0) }
     var isTimerRunning by remember { mutableStateOf(false) }
+    var selectedTabIndex by remember { mutableStateOf(0) }
+    var showAddBlockDialog by remember { mutableStateOf(false) }
+    var newBlockTitle by remember { mutableStateOf("") }
+    var newBlockDuration by remember { mutableStateOf("") }
 
     val context = LocalContext.current
     val notificationHelper = remember { com.example.util.NotificationHelper(context) }
@@ -74,26 +81,46 @@ fun RoomScreen(
         } else if (isTimerRunning && timeRemainingSecs == 0) {
             isTimerRunning = false
             // Mark block complete if needed
-            activeBlock?.let { 
-                viewModel.completeBlock(it) 
+            if (activeBlock != null) {
+                viewModel.completeBlock(activeBlock!!) 
                 notificationHelper.showTimerCompleteNotification(
                     title = "Time's Up!", 
-                    message = "${it.title} is complete."
+                    message = "${activeBlock!!.title} is complete."
+                )
+            } else if (maxTimeSecs > 0) {
+                val manualTitle = if (maxTimeSecs == 25 * 60) "Focus Session" else if (maxTimeSecs == 5 * 60) "Short Break" else if (maxTimeSecs == 15 * 60) "Long Break" else "Timer"
+                notificationHelper.showTimerCompleteNotification(
+                    title = "Time's Up!", 
+                    message = "$manualTitle is complete."
                 )
             }
         }
     }
 
     val r = room!!
-    val roomColor = Color(r.colorArgb)
+    val roomColor = Color(r.colorArgb.toInt())
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
-    ) {
-        // Header
+    Scaffold(
+        floatingActionButton = {
+            if (selectedTabIndex == 0) {
+                FloatingActionButton(
+                    onClick = { showAddBlockDialog = true },
+                    containerColor = roomColor,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add Task")
+                }
+            }
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(paddingValues)
+                .padding(16.dp)
+        ) {
+            // Header
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
@@ -112,8 +139,8 @@ fun RoomScreen(
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(32.dp)),
             contentAlignment = Alignment.Center
         ) {
-            val progress = if (activeBlock == null || timeRemainingSecs == 0) 0f
-               else timeRemainingSecs.toFloat() / (activeBlock!!.durationMin * 60).toFloat()
+            val progress = if (maxTimeSecs == 0) 0f
+               else timeRemainingSecs.toFloat() / maxTimeSecs.toFloat()
 
             CircularProgressIndicator(
                 progress = { progress },
@@ -134,7 +161,7 @@ fun RoomScreen(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = activeBlock?.title ?: "Select a Block",
+                    text = activeBlock?.title ?: if (maxTimeSecs == 25 * 60) "Focus Session" else if (maxTimeSecs == 5 * 60) "Short Break" else if (maxTimeSecs == 15 * 60) "Long Break" else "Select a Block",
                     style = MaterialTheme.typography.titleMedium,
                     color = roomColor
                 )
@@ -144,7 +171,7 @@ fun RoomScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     IconButton(
                         onClick = {
-                            if (activeBlock != null) {
+                            if (activeBlock != null || timeRemainingSecs > 0) {
                                 isTimerRunning = !isTimerRunning
                             }
                         },
@@ -159,6 +186,32 @@ fun RoomScreen(
                             modifier = Modifier.size(32.dp)
                         )
                     }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = {
+                        activeBlock = null
+                        val duration = 25 * 60
+                        timeRemainingSecs = duration
+                        maxTimeSecs = duration
+                        isTimerRunning = false
+                    }) { Text("Focus", color = roomColor) }
+                    TextButton(onClick = {
+                        activeBlock = null
+                        val duration = 5 * 60
+                        timeRemainingSecs = duration
+                        maxTimeSecs = duration
+                        isTimerRunning = false
+                    }) { Text("Short Break", color = roomColor) }
+                    TextButton(onClick = {
+                        activeBlock = null
+                        val duration = 15 * 60
+                        timeRemainingSecs = duration
+                        maxTimeSecs = duration
+                        isTimerRunning = false
+                    }) { Text("Long Break", color = roomColor) }
                 }
             }
         }
@@ -221,7 +274,9 @@ fun RoomScreen(
                             .background(if (isCurrent) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
                             .clickable {
                                 activeBlock = block
-                                timeRemainingSecs = block.durationMin * 60
+                                val duration = block.durationMin * 60
+                                timeRemainingSecs = duration
+                                maxTimeSecs = duration
                                 isTimerRunning = false
                             }
                             .padding(16.dp),
@@ -229,12 +284,15 @@ fun RoomScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(24.dp)
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .clickable { viewModel.completeBlock(block) }
                                 .background(
                                     if (isCompleted) roomColor else Color.Transparent, 
                                     CircleShape
                                 )
-                                .padding(2.dp)
+                                .padding(2.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             if (isCompleted) {
                                 Icon(Icons.Filled.Check, contentDescription = "Done", tint = MaterialTheme.colorScheme.background, modifier = Modifier.size(20.dp))
@@ -244,6 +302,9 @@ fun RoomScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(block.title, style = MaterialTheme.typography.bodyLarge, color = if (isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
                             Text("${block.durationMin} mins", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        IconButton(onClick = { viewModel.deleteBlock(block) }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -258,5 +319,51 @@ fun RoomScreen(
                 )
             }
         }
+    }
+    }
+
+    if (showAddBlockDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddBlockDialog = false },
+            title = { Text("Add Task") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = newBlockTitle,
+                        onValueChange = { newBlockTitle = it },
+                        label = { Text("Task Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newBlockDuration,
+                        onValueChange = { newBlockDuration = it },
+                        label = { Text("Duration (mins)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val duration = newBlockDuration.toIntOrNull() ?: 25
+                        if (newBlockTitle.isNotBlank()) {
+                            viewModel.addBlock(roomId, newBlockTitle.trim(), duration)
+                        }
+                        showAddBlockDialog = false
+                        newBlockTitle = ""
+                        newBlockDuration = ""
+                    }
+                ) {
+                    Text("Add")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddBlockDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

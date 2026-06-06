@@ -228,7 +228,7 @@ fun HomeScreen(
 
 @Composable
 fun RoomCard(room: RoomEntity, onClick: () -> Unit) {
-    val roomColor = Color(room.colorArgb)
+    val roomColor = Color(room.colorArgb.toInt())
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     
