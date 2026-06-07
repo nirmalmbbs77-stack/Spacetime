@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -58,6 +59,9 @@ fun RoomScreen(
     var showAddBlockDialog by remember { mutableStateOf(false) }
     var newBlockTitle by remember { mutableStateOf("") }
     var newBlockDuration by remember { mutableStateOf("") }
+    var isGlassmorphismEnabled by remember { mutableStateOf(false) }
+    var showEditTimerDialog by remember { mutableStateOf(false) }
+    var customEditTimerMins by remember { mutableStateOf("") }
 
     val context = LocalContext.current
     val notificationHelper = remember { com.example.util.NotificationHelper(context) }
@@ -113,108 +117,145 @@ fun RoomScreen(
             }
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(paddingValues)
-                .padding(16.dp)
-        ) {
-            // Header
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            if (isGlassmorphismEnabled) {
+                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawCircle(roomColor.copy(alpha = 0.4f), radius = size.width / 1.5f, center = androidx.compose.ui.geometry.Offset(0f, 0f))
+                    drawCircle(roomColor.copy(alpha = 0.2f), radius = size.width / 1.2f, center = androidx.compose.ui.geometry.Offset(size.width, size.height))
+                }
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(r.name, style = MaterialTheme.typography.titleLarge, color = roomColor)
-        }
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp)
+            ) {
+                // Header
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(r.name, style = MaterialTheme.typography.titleLarge, color = roomColor)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Glass", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onBackground)
+                    Switch(
+                        checked = isGlassmorphismEnabled,
+                        onCheckedChange = { isGlassmorphismEnabled = it },
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+            }
 
-        // Timer Section
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(0.4f)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(32.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            val progress = if (maxTimeSecs == 0) 0f
-               else timeRemainingSecs.toFloat() / maxTimeSecs.toFloat()
+            Spacer(modifier = Modifier.height(24.dp))
 
-            CircularProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.size(240.dp),
-                color = roomColor,
-                trackColor = roomColor.copy(alpha = 0.1f),
-                strokeWidth = 8.dp
-            )
+            val glassModifier = if (isGlassmorphismEnabled) {
+                Modifier
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(Color.White.copy(alpha = 0.1f))
+                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(32.dp))
+            } else {
+                Modifier.background(MaterialTheme.colorScheme.surface, RoundedCornerShape(32.dp))
+            }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                val displaySecs = timeRemainingSecs % 60
-                val displayMins = timeRemainingSecs / 60
-                val timeStr = String.format("%02d:%02d", displayMins, displaySecs)
-
-                Text(
-                    text = timeStr,
-                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = activeBlock?.title ?: if (maxTimeSecs == 25 * 60) "Focus Session" else if (maxTimeSecs == 5 * 60) "Short Break" else if (maxTimeSecs == 15 * 60) "Long Break" else "Select a Block",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = roomColor
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    IconButton(
-                        onClick = {
-                            if (activeBlock != null || timeRemainingSecs > 0) {
-                                isTimerRunning = !isTimerRunning
-                            }
-                        },
-                        modifier = Modifier
-                            .size(64.dp)
-                            .background(roomColor.copy(alpha = 0.2f), CircleShape)
+            // Timer Section
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.45f)
+                    .then(glassModifier)
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier.weight(1f).aspectRatio(1f),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            if (isTimerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = "Play/Pause",
-                            tint = roomColor,
-                            modifier = Modifier.size(32.dp)
+                        val progress = if (maxTimeSecs == 0) 0f
+                           else timeRemainingSecs.toFloat() / maxTimeSecs.toFloat()
+
+                        CircularProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.fillMaxSize(),
+                            color = roomColor,
+                            trackColor = roomColor.copy(alpha = 0.1f),
+                            strokeWidth = 10.dp,
+                            strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
                         )
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            val displaySecs = timeRemainingSecs % 60
+                            val displayMins = timeRemainingSecs / 60
+                            val timeStr = String.format("%02d:%02d", displayMins, displaySecs)
+
+                            Text(
+                                text = timeStr,
+                                style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.clickable { 
+                                    customEditTimerMins = displayMins.toString()
+                                    showEditTimerDialog = true 
+                                }
+                            )
+                            Text(
+                                text = activeBlock?.title ?: if (maxTimeSecs == 25 * 60) "Focus Session" else if (maxTimeSecs == 5 * 60) "Short Break" else if (maxTimeSecs == 15 * 60) "Long Break" else "Select a Block",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = roomColor
+                            )
+
+                            Spacer(modifier = Modifier.height(24.dp))
+
+                            IconButton(
+                                onClick = {
+                                    if (activeBlock != null || timeRemainingSecs > 0) {
+                                        isTimerRunning = !isTimerRunning
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .background(roomColor.copy(alpha = 0.2f), CircleShape)
+                            ) {
+                                Icon(
+                                    if (isTimerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                    contentDescription = "Play/Pause",
+                                    tint = roomColor,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                        TextButton(onClick = {
+                            activeBlock = null
+                            val duration = 25 * 60
+                            timeRemainingSecs = duration
+                            maxTimeSecs = duration
+                            isTimerRunning = false
+                        }) { Text("Focus", color = roomColor) }
+                        TextButton(onClick = {
+                            activeBlock = null
+                            val duration = 5 * 60
+                            timeRemainingSecs = duration
+                            maxTimeSecs = duration
+                            isTimerRunning = false
+                        }) { Text("Short Break", color = roomColor) }
+                        TextButton(onClick = {
+                            activeBlock = null
+                            val duration = 15 * 60
+                            timeRemainingSecs = duration
+                            maxTimeSecs = duration
+                            isTimerRunning = false
+                        }) { Text("Long Break", color = roomColor) }
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                    TextButton(onClick = {
-                        activeBlock = null
-                        val duration = 25 * 60
-                        timeRemainingSecs = duration
-                        maxTimeSecs = duration
-                        isTimerRunning = false
-                    }) { Text("Focus", color = roomColor) }
-                    TextButton(onClick = {
-                        activeBlock = null
-                        val duration = 5 * 60
-                        timeRemainingSecs = duration
-                        maxTimeSecs = duration
-                        isTimerRunning = false
-                    }) { Text("Short Break", color = roomColor) }
-                    TextButton(onClick = {
-                        activeBlock = null
-                        val duration = 15 * 60
-                        timeRemainingSecs = duration
-                        maxTimeSecs = duration
-                        isTimerRunning = false
-                    }) { Text("Long Break", color = roomColor) }
-                }
             }
-        }
 
         var selectedTabIndex by remember { mutableStateOf(0) }
 
@@ -321,6 +362,7 @@ fun RoomScreen(
         }
     }
     }
+    }
 
     if (showAddBlockDialog) {
         AlertDialog(
@@ -361,6 +403,42 @@ fun RoomScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showAddBlockDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showEditTimerDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditTimerDialog = false },
+            title = { Text("Edit Timer") },
+            text = {
+                OutlinedTextField(
+                    value = customEditTimerMins,
+                    onValueChange = { customEditTimerMins = it },
+                    label = { Text("Duration (mins)") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val newDuration = customEditTimerMins.toIntOrNull()
+                    if (newDuration != null && newDuration > 0) {
+                        timeRemainingSecs = newDuration * 60
+                        maxTimeSecs = timeRemainingSecs
+                        isTimerRunning = false
+                        activeBlock = null
+                    }
+                    showEditTimerDialog = false
+                }) {
+                    Text("Set")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditTimerDialog = false }) {
                     Text("Cancel")
                 }
             }
