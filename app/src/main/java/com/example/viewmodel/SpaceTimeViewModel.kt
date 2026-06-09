@@ -170,6 +170,12 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
             repository.deleteTimeBlockById(block.blockId)
         }
     }
+
+    fun deleteRoom(room: RoomEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.deleteRoomById(room.roomId) // It should be roomId, let's check RoomEntity.
+        }
+    }
 }
 
 class SpaceTimeViewModelFactory(private val repository: SpaceTimeRepository) : ViewModelProvider.Factory {

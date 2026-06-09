@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -49,10 +50,8 @@ fun HomeScreen(
     onNavigateToRoom: (Int) -> Unit
 ) {
     val rooms by viewModel.rooms.collectAsStateWithLifecycle()
-    val isGenerating by viewModel.isGenerating.collectAsStateWithLifecycle()
     val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
-    var promptText by remember { mutableStateOf("") }
 
     var showCreateRoomDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
@@ -147,7 +146,11 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(rooms) { room ->
-                        RoomCard(room = room, onClick = { onNavigateToRoom(room.roomId) })
+                        RoomCard(
+                            room = room,
+                            onClick = { onNavigateToRoom(room.roomId) },
+                            onDelete = { viewModel.deleteRoom(room) }
+                        )
                     }
                 }
             }
@@ -162,51 +165,7 @@ fun HomeScreen(
                 )
             }
 
-            // AI Prompt Box
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(24.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextField(
-                        value = promptText,
-                        onValueChange = { promptText = it },
-                        modifier = Modifier.weight(1f),
-                        placeholder = { Text("AI: e.g. Make a 4 hr study room", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        singleLine = true
-                    )
 
-                    IconButton(
-                        onClick = {
-                            if (promptText.isNotBlank() && !isGenerating) {
-                                viewModel.createRoomFromText(promptText)
-                                promptText = ""
-                            }
-                        },
-                        modifier = Modifier
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), shape = RoundedCornerShape(16.dp))
-                    ) {
-                        if (isGenerating) {
-                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Filled.AutoAwesome, contentDescription = "Generate", tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                }
-            }
         }
 
         FloatingActionButton(
@@ -322,7 +281,7 @@ fun HomeScreen(
 }
 
 @Composable
-fun RoomCard(room: RoomEntity, onClick: () -> Unit) {
+fun RoomCard(room: RoomEntity, onClick: () -> Unit, onDelete: () -> Unit) {
     val roomColor = Color(room.colorArgb.toInt())
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -373,15 +332,21 @@ fun RoomCard(room: RoomEntity, onClick: () -> Unit) {
                     Icon(Icons.Filled.AutoAwesome, contentDescription = "Room Icon", tint = roomColor)
                 }
 
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(32.dp)) {
-                    val progress = ((room.totalSessionsCompleted % 10) / 10f).coerceAtLeast(0.1f)
-                    CircularProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxSize(),
-                        color = roomColor,
-                        trackColor = roomColor.copy(alpha = 0.2f),
-                        strokeWidth = 3.dp
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Delete Room", tint = roomColor)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(32.dp)) {
+                        val progress = ((room.totalSessionsCompleted % 10) / 10f).coerceAtLeast(0.1f)
+                        CircularProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.fillMaxSize(),
+                            color = roomColor,
+                            trackColor = roomColor.copy(alpha = 0.2f),
+                            strokeWidth = 3.dp
+                        )
+                    }
                 }
             }
 
