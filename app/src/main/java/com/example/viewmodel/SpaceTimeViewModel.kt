@@ -176,6 +176,20 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
             repository.deleteRoomById(room.roomId) // It should be roomId, let's check RoomEntity.
         }
     }
+
+    fun updateRoomNameAndColor(room: RoomEntity, newName: String, newColorArgb: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val updated = room.copy(name = newName, colorArgb = newColorArgb)
+            repository.updateRoom(updated)
+        }
+    }
+
+    fun updateTimeBlockDetails(block: TimeBlockEntity, newTitle: String, newDuration: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val updated = block.copy(title = newTitle, durationMin = newDuration)
+            repository.updateTimeBlock(updated)
+        }
+    }
 }
 
 class SpaceTimeViewModelFactory(private val repository: SpaceTimeRepository) : ViewModelProvider.Factory {

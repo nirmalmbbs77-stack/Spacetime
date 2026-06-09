@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
@@ -59,6 +60,12 @@ fun HomeScreen(
     val colors = listOf(Color(0xFF00FFCC), Color(0xFFA200FF), Color(0xFFFF0080), Color(0xFFFFB800), Color(0xFF00E5FF))
     var selectedColor by remember { mutableStateOf(colors[0]) }
     var showCustomColorPicker by remember { mutableStateOf(false) }
+    var roomToEdit by remember { mutableStateOf<RoomEntity?>(null) }
+    
+    // For editing
+    var editRoomName by remember { mutableStateOf("") }
+    var editSelectedColor by remember { mutableStateOf(colors[0]) }
+    var showEditCustomColorPicker by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
@@ -149,6 +156,11 @@ fun HomeScreen(
                         RoomCard(
                             room = room,
                             onClick = { onNavigateToRoom(room.roomId) },
+                            onEdit = { 
+                                roomToEdit = room
+                                editRoomName = room.name
+                                editSelectedColor = Color(room.colorArgb.toInt())
+                            },
                             onDelete = { viewModel.deleteRoom(room) }
                         )
                     }
@@ -266,11 +278,108 @@ fun HomeScreen(
             )
         }
 
+        if (roomToEdit != null) {
+            AlertDialog(
+                onDismissRequest = { roomToEdit = null },
+                title = { Text("Edit Room") },
+                text = {
+                    Column {
+                        OutlinedTextField(
+                            value = editRoomName,
+                            onValueChange = { editRoomName = it },
+                            label = { Text("Room Name") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Room Color", style = MaterialTheme.typography.labelLarge)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            colors.forEach { color ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(color, androidx.compose.foundation.shape.CircleShape)
+                                        .clickable { editSelectedColor = color }
+                                        .drawBehind {
+                                            if (editSelectedColor == color) {
+                                                drawCircle(
+                                                    color = Color.White,
+                                                    radius = size.width / 2 + 4.dp.toPx(),
+                                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                                                )
+                                            }
+                                        }
+                                )
+                            }
+                            
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(
+                                        brush = Brush.sweepGradient(
+                                            colors = listOf(
+                                                Color.Red, Color.Yellow, Color.Green, Color.Cyan,
+                                                Color.Blue, Color.Magenta, Color.Red
+                                            )
+                                        ),
+                                        shape = androidx.compose.foundation.shape.CircleShape
+                                    )
+                                    .clickable { showEditCustomColorPicker = true }
+                                    .drawBehind {
+                                        if (!colors.contains(editSelectedColor)) {
+                                            drawCircle(
+                                                color = Color.White,
+                                                radius = size.width / 2 + 4.dp.toPx(),
+                                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                                            )
+                                        }
+                                    }
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (editRoomName.isNotBlank()) {
+                                viewModel.updateRoomNameAndColor(
+                                    room = roomToEdit!!, 
+                                    newName = editRoomName, 
+                                    newColorArgb = editSelectedColor.toArgb().toLong()
+                                )
+                                roomToEdit = null
+                            }
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { roomToEdit = null }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
         if (showCustomColorPicker) {
             PicsartColorPickerDialog(
                 initialColor = selectedColor,
                 onColorSelected = { selectedColor = it },
                 onDismiss = { showCustomColorPicker = false }
+            )
+        }
+
+        if (showEditCustomColorPicker) {
+            PicsartColorPickerDialog(
+                initialColor = editSelectedColor,
+                onColorSelected = { editSelectedColor = it },
+                onDismiss = { showEditCustomColorPicker = false }
             )
         }
 
@@ -280,8 +389,9 @@ fun HomeScreen(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun RoomCard(room: RoomEntity, onClick: () -> Unit, onDelete: () -> Unit) {
+fun RoomCard(room: RoomEntity, onClick: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
     val roomColor = Color(room.colorArgb.toInt())
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -307,10 +417,11 @@ fun RoomCard(room: RoomEntity, onClick: () -> Unit, onDelete: () -> Unit) {
                     )
                 )
             }
-            .clickable(
+            .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onClick
+                onClick = onClick,
+                onLongClick = onEdit
             )
             .padding(16.dp)
     ) {

@@ -37,6 +37,10 @@ import com.example.data.TimeBlockEntity
 import com.example.viewmodel.SpaceTimeViewModel
 import kotlinx.coroutines.delay
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RoomScreen(
     roomId: Int,
@@ -63,6 +67,11 @@ fun RoomScreen(
     var newBlockDuration by remember { mutableStateOf("") }
     var showEditTimerDialog by remember { mutableStateOf(false) }
     var customEditTimerMins by remember { mutableStateOf("") }
+    
+    // For editing time block
+    var blockToEdit by remember { mutableStateOf<TimeBlockEntity?>(null) }
+    var editBlockTitle by remember { mutableStateOf("") }
+    var editBlockDuration by remember { mutableStateOf("") }
 
     val context = LocalContext.current
     val notificationHelper = remember { com.example.util.NotificationHelper(context) }
@@ -418,13 +427,20 @@ fun RoomScreen(
                             .fillMaxWidth()
                             .background(cardBg, RoundedCornerShape(20.dp))
                             .border(0.5.dp, cardBorder, RoundedCornerShape(20.dp))
-                            .clickable {
-                                activeBlock = block
-                                val duration = block.durationMin * 60
-                                timeRemainingSecs = duration
-                                maxTimeSecs = duration
-                                isTimerRunning = false
-                            }
+                            .combinedClickable(
+                                onClick = {
+                                    activeBlock = block
+                                    val duration = block.durationMin * 60
+                                    timeRemainingSecs = duration
+                                    maxTimeSecs = duration
+                                    isTimerRunning = false
+                                },
+                                onLongClick = {
+                                    blockToEdit = block
+                                    editBlockTitle = block.title
+                                    editBlockDuration = block.durationMin.toString()
+                                }
+                            )
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -600,6 +616,50 @@ fun RoomScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showEditTimerDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (blockToEdit != null) {
+        AlertDialog(
+            onDismissRequest = { blockToEdit = null },
+            title = { Text("Edit Task") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = editBlockTitle,
+                        onValueChange = { editBlockTitle = it },
+                        label = { Text("Task Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = editBlockDuration,
+                        onValueChange = { editBlockDuration = it },
+                        label = { Text("Duration (mins)") },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val duration = editBlockDuration.toIntOrNull() ?: 25
+                        if (editBlockTitle.isNotBlank()) {
+                            viewModel.updateTimeBlockDetails(blockToEdit!!, editBlockTitle.trim(), duration)
+                        }
+                        blockToEdit = null
+                    }
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { blockToEdit = null }) {
                     Text("Cancel")
                 }
             }
