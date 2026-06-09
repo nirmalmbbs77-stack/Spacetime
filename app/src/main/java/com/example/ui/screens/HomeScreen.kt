@@ -31,12 +31,16 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.RoomEntity
 import com.example.viewmodel.SpaceTimeViewModel
+import com.example.ui.components.PicsartColorPickerDialog
 import androidx.compose.ui.platform.LocalContext
 import android.media.RingtoneManager
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Context
+
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +59,7 @@ fun HomeScreen(
     var newRoomName by remember { mutableStateOf("") }
     val colors = listOf(Color(0xFF00FFCC), Color(0xFFA200FF), Color(0xFFFF0080), Color(0xFFFFB800), Color(0xFF00E5FF))
     var selectedColor by remember { mutableStateOf(colors[0]) }
+    var showCustomColorPicker by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
@@ -63,15 +68,30 @@ fun HomeScreen(
                 .padding(16.dp)
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "SpaceTime.",
-                    style = MaterialTheme.typography.displayMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = com.example.R.drawable.spacetime_logo),
+                        contentDescription = "SpaceTime Logo",
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                    )
+                    Text(
+                        text = "SpaceTime.",
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = (-0.5).sp
+                        ),
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { viewModel.toggleTheme() }) {
                         Icon(
@@ -88,12 +108,36 @@ fun HomeScreen(
 
             if (rooms.isEmpty()) {
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    Text(
-                        "No rooms yet.\nGenerate one below.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(24.dp)
+                    ) {
+                        Image(
+                            painter = painterResource(id = com.example.R.drawable.spacetime_logo),
+                            contentDescription = "SpaceTime Logo Banner",
+                            modifier = Modifier
+                                .size(130.dp)
+                                .clip(RoundedCornerShape(32.dp))
+                                .background(Color.Black)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            "SpaceTime.",
+                            style = MaterialTheme.typography.headlineLarge.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 0.5.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            "A futuristic, minimal, highly immersive Pomodoro productivity ecosystem.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.widthIn(max = 280.dp)
+                        )
+                    }
                 }
             } else {
                 LazyVerticalGrid(
@@ -194,7 +238,8 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             colors.forEach { color ->
                                 Box(
@@ -213,6 +258,31 @@ fun HomeScreen(
                                         }
                                 )
                             }
+                            
+                            // Beautiful custom Picsart HSB colorful sweep gradient wheel
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(
+                                        brush = Brush.sweepGradient(
+                                            colors = listOf(
+                                                Color.Red, Color.Yellow, Color.Green, Color.Cyan,
+                                                Color.Blue, Color.Magenta, Color.Red
+                                            )
+                                        ),
+                                        shape = androidx.compose.foundation.shape.CircleShape
+                                    )
+                                    .clickable { showCustomColorPicker = true }
+                                    .drawBehind {
+                                        if (!colors.contains(selectedColor)) {
+                                            drawCircle(
+                                                color = Color.White,
+                                                radius = size.width / 2 + 4.dp.toPx(),
+                                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                                            )
+                                        }
+                                    }
+                            )
                         }
                     }
                 },
@@ -234,6 +304,14 @@ fun HomeScreen(
                         Text("Cancel")
                     }
                 }
+            )
+        }
+
+        if (showCustomColorPicker) {
+            PicsartColorPickerDialog(
+                initialColor = selectedColor,
+                onColorSelected = { selectedColor = it },
+                onDismiss = { showCustomColorPicker = false }
             )
         }
 

@@ -56,6 +56,12 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
             try {
                 val apiKey = BuildConfig.GEMINI_API_KEY
                 
+                if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
+                    errorMessage.value = "To use AI, please set your Gemini API key in the Secrets panel of Google AI Studio."
+                    isGenerating.value = false
+                    return@launch
+                }
+                
                 val promptText = """
                     Generate a productivity pomodoro schedule based on: $prompt.
                     Return ONLY valid JSON in this exact format:

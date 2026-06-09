@@ -26,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -101,7 +103,27 @@ fun RoomScreen(
     }
 
     val r = room!!
-    val roomColor = Color(r.colorArgb.toInt())
+    val isBreakActive = (activeBlock == null && (maxTimeSecs == 5 * 60 || maxTimeSecs == 15 * 60)) || 
+            (activeBlock != null && activeBlock!!.title.lowercase().contains("break"))
+    
+    val roomColor = if (isBreakActive) {
+        Color(0xFF2E7D32) // Relaxing natural green
+    } else {
+        Color(r.colorArgb.toInt())
+    }
+
+    val isDark = MaterialTheme.colorScheme.background.red < 0.5f
+    val backgroundColor = if (isBreakActive) {
+        if (isDark) Color(0xFF0B1B0F) else Color(0xFFF1F8F3) // immersive soft green backgrounds
+    } else {
+        MaterialTheme.colorScheme.background
+    }
+
+    val surfaceColor = if (isBreakActive) {
+        if (isDark) Color(0xFF142C19) else Color(0xFFE8F5E9) // relaxing green container
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
 
     Scaffold(
         floatingActionButton = {
@@ -116,7 +138,39 @@ fun RoomScreen(
             }
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        val bgGradient = if (isDark) {
+            androidx.compose.ui.graphics.Brush.verticalGradient(
+                colors = listOf(
+                    backgroundColor,
+                    roomColor.copy(alpha = 0.08f),
+                    backgroundColor
+                )
+            )
+        } else {
+            androidx.compose.ui.graphics.Brush.verticalGradient(
+                colors = listOf(
+                    backgroundColor,
+                    roomColor.copy(alpha = 0.05f),
+                    backgroundColor
+                )
+            )
+        }
+
+        Box(modifier = Modifier.fillMaxSize().background(bgGradient)) {
+            // Ambient glowing gradient orbs in the background for real glassy reflection
+            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                drawCircle(
+                    color = roomColor.copy(alpha = if (isDark) 0.12f else 0.08f),
+                    radius = size.width * 0.8f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.2f)
+                )
+                drawCircle(
+                    color = roomColor.copy(alpha = if (isDark) 0.08f else 0.06f),
+                    radius = size.width * 0.6f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.7f)
+                )
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -136,12 +190,20 @@ fun RoomScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Timer Section
+            // Timer Section (Solid minimalist and thin stroke of Apple design)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(0.55f)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(32.dp)),
+                    .background(
+                        surfaceColor,
+                        RoundedCornerShape(32.dp)
+                    )
+                    .border(
+                        1.dp,
+                        if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f),
+                        RoundedCornerShape(32.dp)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
@@ -254,32 +316,57 @@ fun RoomScreen(
         ) {
             Text(
                 text = if (selectedTabIndex == 0) "TIME BLOCKS" else "ANALYTICS", 
-                style = MaterialTheme.typography.labelLarge, 
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp), 
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
             )
             
+            // iOS 26 Segmented Control
             Row(
                 modifier = Modifier
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
-                    .padding(4.dp)
+                    .background(
+                        if (isDark) Color(0xFF222222) else Color(0xFFEEEEEE), 
+                        RoundedCornerShape(20.dp)
+                    )
+                    .border(
+                        0.5.dp,
+                        if (isDark) Color(0xFF333333) else Color(0xFFDDDDDD),
+                        RoundedCornerShape(20.dp)
+                    )
+                    .padding(3.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (selectedTabIndex == 0) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            if (selectedTabIndex == 0) {
+                                if (isDark) Color(0xFF3C3C3C) else Color.White
+                            } else Color.Transparent
+                        )
                         .clickable { selectedTabIndex = 0 }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
-                    Text("Tasks", style = MaterialTheme.typography.labelMedium, color = if (selectedTabIndex == 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = "Tasks", 
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium), 
+                        color = if (selectedTabIndex == 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (selectedTabIndex == 1) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            if (selectedTabIndex == 1) {
+                                if (isDark) Color(0xFF3C3C3C) else Color.White
+                            } else Color.Transparent
+                        )
                         .clickable { selectedTabIndex = 1 }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
-                    Text("Trends", style = MaterialTheme.typography.labelMedium, color = if (selectedTabIndex == 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = "Trends", 
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium), 
+                        color = if (selectedTabIndex == 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -287,19 +374,50 @@ fun RoomScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         if (selectedTabIndex == 0) {
-            // Time Blocks Timeline
+            // Minimalist iOS 26 Glassy Timeline
+            val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
             LazyColumn(
                 modifier = Modifier.weight(0.45f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(timeBlocks) { block ->
                     val isCompleted = block.isCompleted
                     val isCurrent = activeBlock?.blockId == block.blockId
                     
+                    val checkScale by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (isCompleted) 1.15f else 1.0f,
+                        animationSpec = androidx.compose.animation.core.spring(
+                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+                        ),
+                        label = "check_scale"
+                    )
+
+                    val checkmarkScale by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (isCompleted) 1.0f else 0.0f,
+                        animationSpec = androidx.compose.animation.core.spring(
+                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioHighBouncy,
+                            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+                        ),
+                        label = "checkmark_scale"
+                    )
+                    
+                    val cardBg = if (isCurrent) {
+                        roomColor.copy(alpha = if (isDark) 0.22f else 0.15f)
+                    } else {
+                        if (isDark) Color(0xFF1E1E1E) else Color(0xFFF5F5F5)
+                    }
+                    val cardBorder = if (isCurrent) {
+                        roomColor.copy(alpha = 0.5f)
+                    } else {
+                        if (isDark) Color(0xFF2E2E2E) else Color(0xFFE5E5E5)
+                    }
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(if (isCurrent) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                            .background(cardBg, RoundedCornerShape(20.dp))
+                            .border(0.5.dp, cardBorder, RoundedCornerShape(20.dp))
                             .clickable {
                                 activeBlock = block
                                 val duration = block.durationMin * 60
@@ -307,39 +425,95 @@ fun RoomScreen(
                                 maxTimeSecs = duration
                                 isTimerRunning = false
                             }
-                            .padding(16.dp),
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .clickable { viewModel.completeBlock(block) }
+                                .size(24.dp)
+                                .graphicsLayer(
+                                    scaleX = checkScale,
+                                    scaleY = checkScale
+                                )
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { 
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.completeBlock(block) 
+                                }
                                 .background(
                                     if (isCompleted) roomColor else Color.Transparent, 
-                                    CircleShape
+                                    RoundedCornerShape(6.dp)
                                 )
-                                .padding(2.dp),
+                                .border(
+                                    1.5.dp,
+                                    if (isCompleted) Color.Transparent else roomColor.copy(alpha = 0.5f),
+                                    RoundedCornerShape(6.dp)
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (isCompleted) {
-                                Icon(Icons.Filled.Check, contentDescription = "Done", tint = MaterialTheme.colorScheme.background, modifier = Modifier.size(20.dp))
+                            if (checkmarkScale > 0.01f) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check, 
+                                    contentDescription = "Done", 
+                                    tint = Color.White, 
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .graphicsLayer(
+                                            scaleX = checkmarkScale,
+                                            scaleY = checkmarkScale
+                                        )
+                                )
                             }
                         }
-                        Spacer(modifier = Modifier.width(16.dp))
+                        
+                        Spacer(modifier = Modifier.width(14.dp))
+                        
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(block.title, style = MaterialTheme.typography.bodyLarge, color = if (isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
-                            Text("${block.durationMin} mins", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                text = block.title, 
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    textDecoration = if (isCompleted) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                                ), 
+                                color = if (isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f) else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${block.durationMin} mins", 
+                                style = MaterialTheme.typography.bodySmall, 
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
                         }
-                        IconButton(onClick = { viewModel.deleteBlock(block) }) {
-                            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        
+                        IconButton(
+                            onClick = { viewModel.deleteBlock(block) },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Delete, 
+                                contentDescription = "Delete", 
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }
             }
         } else {
-            // Analytics View
-            Box(modifier = Modifier.weight(0.45f)) {
+            // Analytics View (with solid backdrop instead of glass!)
+            Box(
+                modifier = Modifier
+                    .weight(0.45f)
+                    .background(
+                        if (isDark) Color(0xFF1E1E1E) else Color(0xFFF5F5F5), 
+                        RoundedCornerShape(24.dp)
+                    )
+                    .border(
+                        0.5.dp,
+                        if (isDark) Color(0xFF2E2E2E) else Color(0xFFE5E5E5),
+                        RoundedCornerShape(24.dp)
+                    )
+                    .padding(16.dp)
+            ) {
                 com.example.ui.components.ProductivityChart(
                     roomColor = roomColor,
                     totalSessions = r.totalSessionsCompleted,
