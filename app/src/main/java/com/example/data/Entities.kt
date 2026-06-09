@@ -36,5 +36,6 @@ data class TimeBlockEntity(
     val title: String,
     val durationMin: Int,
     val isCompleted: Boolean = false,
-    val orderIndex: Int = 0
+    val orderIndex: Int = 0,
+    val colorArgb: Long = 0xFFFFFFFF // White default for task independent colors
 )

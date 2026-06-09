@@ -46,6 +46,31 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
         }
     }
 
+    fun createImportedRoom(name: String, colorArgb: Long, blocksArray: org.json.JSONArray) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val newRoom = RoomEntity(
+                name = name,
+                colorArgb = colorArgb,
+                iconName = "Star",
+                totalSessionsCompleted = 0
+            )
+            val newRoomId = repository.insertRoom(newRoom).toInt()
+            for (i in 0 until blocksArray.length()) {
+                val blockObj = blocksArray.getJSONObject(i)
+                val title = blockObj.getString("title")
+                val duration = blockObj.getInt("durationMin")
+                val color = if (blockObj.has("colorArgb")) blockObj.getLong("colorArgb") else 0xFFFFFFFF
+                repository.insertTimeBlock(TimeBlockEntity(
+                    roomId = newRoomId,
+                    title = title,
+                    durationMin = duration,
+                    orderIndex = i,
+                    colorArgb = color
+                ))
+            }
+        }
+    }
+
     fun getRoom(id: Int) = repository.getRoomById(id)
     fun getTimeBlocks(id: Int) = repository.getTimeBlocksForRoom(id)
 
@@ -152,14 +177,15 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
         }
     }
 
-    fun addBlock(roomId: Int, title: String, durationMin: Int) {
+    fun addBlock(roomId: Int, title: String, durationMin: Int, colorArgb: Long) {
         viewModelScope.launch(Dispatchers.IO) {
             val newBlock = TimeBlockEntity(
                 roomId = roomId,
                 title = title,
                 durationMin = durationMin,
                 // Using current time as a simple way to append to the end of the list
-                orderIndex = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
+                orderIndex = (System.currentTimeMillis() % Int.MAX_VALUE).toInt(),
+                colorArgb = colorArgb
             )
             repository.insertTimeBlock(newBlock)
         }
@@ -184,9 +210,9 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
         }
     }
 
-    fun updateTimeBlockDetails(block: TimeBlockEntity, newTitle: String, newDuration: Int) {
+    fun updateTimeBlockDetails(block: TimeBlockEntity, newTitle: String, newDuration: Int, newColorArgb: Long) {
         viewModelScope.launch(Dispatchers.IO) {
-            val updated = block.copy(title = newTitle, durationMin = newDuration)
+            val updated = block.copy(title = newTitle, durationMin = newDuration, colorArgb = newColorArgb)
             repository.updateTimeBlock(updated)
         }
     }

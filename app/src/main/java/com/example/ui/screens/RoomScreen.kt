@@ -5,6 +5,9 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,6 +28,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -70,6 +76,8 @@ fun RoomScreen(
     var showAddBlockDialog by remember { mutableStateOf(false) }
     var newBlockTitle by remember { mutableStateOf("") }
     var newBlockDuration by remember { mutableStateOf("") }
+    var newBlockColor by remember { mutableStateOf(Color(0xFFFFFFFF)) }
+    var showCustomBlockColorPicker by remember { mutableStateOf(false) }
     var showEditTimerDialog by remember { mutableStateOf(false) }
     var customEditTimerMins by remember { mutableStateOf("") }
     
@@ -77,6 +85,8 @@ fun RoomScreen(
     var blockToEdit by remember { mutableStateOf<TimeBlockEntity?>(null) }
     var editBlockTitle by remember { mutableStateOf("") }
     var editBlockDuration by remember { mutableStateOf("") }
+    var editBlockColor by remember { mutableStateOf(Color(0xFFFFFFFF)) }
+    var showEditCustomBlockColorPicker by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val notificationHelper = remember { com.example.util.NotificationHelper(context) }
@@ -137,7 +147,9 @@ fun RoomScreen(
     val isBreakActive = (activeBlock == null && (maxTimeSecs == 5 * 60 || maxTimeSecs == 15 * 60)) || 
             (activeBlock != null && activeBlock!!.title.lowercase().contains("break"))
     
-    val roomColor = if (isBreakActive) {
+    val roomColor = if (activeBlock != null && activeBlock.colorArgb != 0xFFFFFFFFL && activeBlock.colorArgb != -1L) {
+        Color(activeBlock.colorArgb.toInt())
+    } else if (isBreakActive) {
         Color(0xFF2E7D32) // Relaxing natural green
     } else {
         Color(r.colorArgb.toInt())
@@ -216,6 +228,24 @@ fun RoomScreen(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(r.name, style = MaterialTheme.typography.titleLarge, color = roomColor)
+                }
+                
+                val clipboardManager = LocalClipboardManager.current
+                IconButton(onClick = {
+                    val shareStr = """
+                        {
+                            "name": "${r.name}",
+                            "colorArgb": ${r.colorArgb},
+                            "blocks": ${timeBlocks.joinToString(prefix = "[", postfix = "]") {
+                                "{\"title\": \"${it.title}\", \"durationMin\": ${it.durationMin}, \"colorArgb\": ${it.colorArgb}}"
+                            }}
+                        }
+                    """.trimIndent()
+                    val encoded = android.util.Base64.encodeToString(shareStr.toByteArray(), android.util.Base64.NO_WRAP)
+                    clipboardManager.setText(AnnotatedString("spacetime://$encoded"))
+                    android.widget.Toast.makeText(context, "Room link copied!", android.widget.Toast.LENGTH_SHORT).show()
+                }) {
+                    Icon(Icons.Filled.Share, contentDescription = "Share Room", tint = roomColor)
                 }
             }
 
@@ -459,6 +489,7 @@ fun RoomScreen(
                                     blockToEdit = block
                                     editBlockTitle = block.title
                                     editBlockDuration = block.durationMin.toString()
+                                    editBlockColor = Color(block.colorArgb.toInt())
                                 }
                             )
                             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -561,6 +592,8 @@ fun RoomScreen(
     }
     }
 
+    val blockColors = listOf(Color(0xFFFFFFFF), Color(0xFF00FFCC), Color(0xFFA200FF), Color(0xFFFF0080), Color(0xFF00E5FF))
+
     if (showAddBlockDialog) {
         com.example.ui.components.IOSAlertDialog(
             onDismissRequest = { showAddBlockDialog = false },
@@ -581,17 +614,67 @@ fun RoomScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Task Color", style = MaterialTheme.typography.labelLarge)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        blockColors.forEach { color ->
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(color, androidx.compose.foundation.shape.CircleShape)
+                                    .border(1.dp, if(isDark) Color.White.copy(0.2f) else Color.Black.copy(0.2f), androidx.compose.foundation.shape.CircleShape)
+                                    .clickable { newBlockColor = color }
+                                    .drawBehind {
+                                        if (newBlockColor == color) {
+                                            drawCircle(
+                                                color = Color.Gray,
+                                                radius = size.width / 2 + 4.dp.toPx(),
+                                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                                            )
+                                        }
+                                    }
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(
+                                    brush = Brush.sweepGradient(
+                                        colors = listOf(
+                                            Color.Red, Color.Yellow, Color.Green, Color.Cyan,
+                                            Color.Blue, Color.Magenta, Color.Red
+                                        )
+                                    ),
+                                    shape = androidx.compose.foundation.shape.CircleShape
+                                )
+                                .clickable { showCustomBlockColorPicker = true }
+                                .drawBehind {
+                                    if (!blockColors.contains(newBlockColor)) {
+                                        drawCircle(
+                                            color = Color.Gray,
+                                            radius = size.width / 2 + 4.dp.toPx(),
+                                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                                        )
+                                    }
+                                }
+                        )
+                    }
                 }
             },
             confirmButtonText = "Add",
             onConfirm = {
                 val duration = newBlockDuration.toIntOrNull() ?: 25
                 if (newBlockTitle.isNotBlank()) {
-                    viewModel.addBlock(roomId, newBlockTitle.trim(), duration)
+                    viewModel.addBlock(roomId, newBlockTitle.trim(), duration, newBlockColor.toArgb().toLong())
                 }
                 showAddBlockDialog = false
                 newBlockTitle = ""
                 newBlockDuration = ""
+                newBlockColor = Color(0xFFFFFFFF)
             },
             dismissButtonText = "Cancel",
             onDismiss = { showAddBlockDialog = false }
@@ -649,18 +732,83 @@ fun RoomScreen(
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Task Color", style = MaterialTheme.typography.labelLarge)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        blockColors.forEach { color ->
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(color, androidx.compose.foundation.shape.CircleShape)
+                                    .border(1.dp, if(isDark) Color.White.copy(0.2f) else Color.Black.copy(0.2f), androidx.compose.foundation.shape.CircleShape)
+                                    .clickable { editBlockColor = color }
+                                    .drawBehind {
+                                        if (editBlockColor == color) {
+                                            drawCircle(
+                                                color = Color.Gray,
+                                                radius = size.width / 2 + 4.dp.toPx(),
+                                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                                            )
+                                        }
+                                    }
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(
+                                    brush = Brush.sweepGradient(
+                                        colors = listOf(
+                                            Color.Red, Color.Yellow, Color.Green, Color.Cyan,
+                                            Color.Blue, Color.Magenta, Color.Red
+                                        )
+                                    ),
+                                    shape = androidx.compose.foundation.shape.CircleShape
+                                )
+                                .clickable { showEditCustomBlockColorPicker = true }
+                                .drawBehind {
+                                    if (!blockColors.contains(editBlockColor)) {
+                                        drawCircle(
+                                            color = Color.Gray,
+                                            radius = size.width / 2 + 4.dp.toPx(),
+                                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                                        )
+                                    }
+                                }
+                        )
+                    }
                 }
             },
             confirmButtonText = "Save",
             onConfirm = {
                 val duration = editBlockDuration.toIntOrNull() ?: 25
                 if (editBlockTitle.isNotBlank()) {
-                    viewModel.updateTimeBlockDetails(blockToEdit!!, editBlockTitle.trim(), duration)
+                    viewModel.updateTimeBlockDetails(blockToEdit!!, editBlockTitle.trim(), duration, editBlockColor.toArgb().toLong())
                 }
                 blockToEdit = null
             },
             dismissButtonText = "Cancel",
             onDismiss = { blockToEdit = null }
+        )
+    }
+
+    if (showCustomBlockColorPicker) {
+        com.example.ui.components.PicsartColorPickerDialog(
+            initialColor = newBlockColor,
+            onColorSelected = { newBlockColor = it },
+            onDismiss = { showCustomBlockColorPicker = false }
+        )
+    }
+
+    if (showEditCustomBlockColorPicker) {
+        com.example.ui.components.PicsartColorPickerDialog(
+            initialColor = editBlockColor,
+            onColorSelected = { editBlockColor = it },
+            onDismiss = { showEditCustomBlockColorPicker = false }
         )
     }
 }

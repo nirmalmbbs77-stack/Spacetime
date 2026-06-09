@@ -37,7 +37,9 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             SpaceTimeDatabase::class.java,
             "spacetime_db"
-        ).build()
+        )
+        .fallbackToDestructiveMigration()
+        .build()
         repository = SpaceTimeRepository(database.spaceTimeDao())
         viewModel = ViewModelProvider(
             this,

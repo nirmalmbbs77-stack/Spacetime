@@ -66,6 +66,10 @@ fun HomeScreen(
     var editRoomName by remember { mutableStateOf("") }
     var editSelectedColor by remember { mutableStateOf(colors[0]) }
     var showEditCustomColorPicker by remember { mutableStateOf(false) }
+    
+    var importLink by remember { mutableStateOf("") }
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
@@ -254,6 +258,42 @@ fun HomeScreen(
                                         }
                                     }
                             )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text("Or Import Room", style = MaterialTheme.typography.labelLarge)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedTextField(
+                                value = importLink,
+                                onValueChange = { importLink = it },
+                                label = { Text("Paste Link (spacetime://...)") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(onClick = {
+                                if (importLink.startsWith("spacetime://")) {
+                                    try {
+                                        val encoded = importLink.removePrefix("spacetime://")
+                                        val jsonStr = String(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT))
+                                        val jsonObj = org.json.JSONObject(jsonStr)
+                                        
+                                        val rName = jsonObj.getString("name")
+                                        val rColor = jsonObj.getLong("colorArgb")
+                                        val blocks = jsonObj.getJSONArray("blocks")
+                                        
+                                        viewModel.createImportedRoom(rName, rColor, blocks)
+                                        
+                                        showCreateRoomDialog = false
+                                        importLink = ""
+                                    } catch (e: Exception) {
+                                        android.widget.Toast.makeText(context, "Invalid link", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }) {
+                                Text("Import")
+                            }
                         }
                     }
                 },
