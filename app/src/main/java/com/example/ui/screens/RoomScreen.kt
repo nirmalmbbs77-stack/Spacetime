@@ -161,7 +161,7 @@ fun RoomScreen(
 
                         CircularProgressIndicator(
                             progress = { progress },
-                            modifier = Modifier.fillMaxSize(0.85f),
+                            modifier = Modifier.fillMaxSize(0.75f),
                             color = roomColor,
                             trackColor = roomColor.copy(alpha = 0.1f),
                             strokeWidth = 10.dp,
@@ -175,7 +175,7 @@ fun RoomScreen(
 
                             Text(
                                 text = timeStr,
-                                style = MaterialTheme.typography.displayLarge.copy(fontSize = 58.sp),
+                                style = MaterialTheme.typography.displayLarge.copy(fontSize = 55.sp),
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 softWrap = false,
