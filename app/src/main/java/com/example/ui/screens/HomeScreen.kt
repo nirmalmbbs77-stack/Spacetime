@@ -192,10 +192,10 @@ fun HomeScreen(
         }
 
         if (showCreateRoomDialog) {
-            AlertDialog(
+            com.example.ui.components.IOSAlertDialog(
                 onDismissRequest = { showCreateRoomDialog = false },
-                title = { Text("Create Room") },
-                text = {
+                title = "Create Room",
+                content = {
                     Column {
                         OutlinedTextField(
                             value = newRoomName,
@@ -257,32 +257,24 @@ fun HomeScreen(
                         }
                     }
                 },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            if (newRoomName.isNotBlank()) {
-                                viewModel.createManualRoom(newRoomName, selectedColor.toArgb().toLong())
-                                showCreateRoomDialog = false
-                                newRoomName = ""
-                            }
-                        }
-                    ) {
-                        Text("Create")
+                confirmButtonText = "Create",
+                onConfirm = {
+                    if (newRoomName.isNotBlank()) {
+                        viewModel.createManualRoom(newRoomName, selectedColor.toArgb().toLong())
+                        showCreateRoomDialog = false
+                        newRoomName = ""
                     }
                 },
-                dismissButton = {
-                    TextButton(onClick = { showCreateRoomDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
+                dismissButtonText = "Cancel",
+                onDismiss = { showCreateRoomDialog = false }
             )
         }
 
         if (roomToEdit != null) {
-            AlertDialog(
+            com.example.ui.components.IOSAlertDialog(
                 onDismissRequest = { roomToEdit = null },
-                title = { Text("Edit Room") },
-                text = {
+                title = "Edit Room",
+                content = {
                     Column {
                         OutlinedTextField(
                             value = editRoomName,
@@ -343,27 +335,19 @@ fun HomeScreen(
                         }
                     }
                 },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            if (editRoomName.isNotBlank()) {
-                                viewModel.updateRoomNameAndColor(
-                                    room = roomToEdit!!, 
-                                    newName = editRoomName, 
-                                    newColorArgb = editSelectedColor.toArgb().toLong()
-                                )
-                                roomToEdit = null
-                            }
-                        }
-                    ) {
-                        Text("Save")
+                confirmButtonText = "Save",
+                onConfirm = {
+                    if (editRoomName.isNotBlank()) {
+                        viewModel.updateRoomNameAndColor(
+                            room = roomToEdit!!, 
+                            newName = editRoomName, 
+                            newColorArgb = editSelectedColor.toArgb().toLong()
+                        )
+                        roomToEdit = null
                     }
                 },
-                dismissButton = {
-                    TextButton(onClick = { roomToEdit = null }) {
-                        Text("Cancel")
-                    }
-                }
+                dismissButtonText = "Cancel",
+                onDismiss = { roomToEdit = null }
             )
         }
 

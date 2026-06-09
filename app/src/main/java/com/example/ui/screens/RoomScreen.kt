@@ -542,10 +542,10 @@ fun RoomScreen(
     }
 
     if (showAddBlockDialog) {
-        AlertDialog(
+        com.example.ui.components.IOSAlertDialog(
             onDismissRequest = { showAddBlockDialog = false },
-            title = { Text("Add Task") },
-            text = {
+            title = "Add Task",
+            content = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = newBlockTitle,
@@ -563,34 +563,26 @@ fun RoomScreen(
                     )
                 }
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val duration = newBlockDuration.toIntOrNull() ?: 25
-                        if (newBlockTitle.isNotBlank()) {
-                            viewModel.addBlock(roomId, newBlockTitle.trim(), duration)
-                        }
-                        showAddBlockDialog = false
-                        newBlockTitle = ""
-                        newBlockDuration = ""
-                    }
-                ) {
-                    Text("Add")
+            confirmButtonText = "Add",
+            onConfirm = {
+                val duration = newBlockDuration.toIntOrNull() ?: 25
+                if (newBlockTitle.isNotBlank()) {
+                    viewModel.addBlock(roomId, newBlockTitle.trim(), duration)
                 }
+                showAddBlockDialog = false
+                newBlockTitle = ""
+                newBlockDuration = ""
             },
-            dismissButton = {
-                TextButton(onClick = { showAddBlockDialog = false }) {
-                    Text("Cancel")
-                }
-            }
+            dismissButtonText = "Cancel",
+            onDismiss = { showAddBlockDialog = false }
         )
     }
 
     if (showEditTimerDialog) {
-        AlertDialog(
+        com.example.ui.components.IOSAlertDialog(
             onDismissRequest = { showEditTimerDialog = false },
-            title = { Text("Edit Timer") },
-            text = {
+            title = "Edit Timer",
+            content = {
                 OutlinedTextField(
                     value = customEditTimerMins,
                     onValueChange = { customEditTimerMins = it },
@@ -600,33 +592,27 @@ fun RoomScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    val newDuration = customEditTimerMins.toIntOrNull()
-                    if (newDuration != null && newDuration > 0) {
-                        timeRemainingSecs = newDuration * 60
-                        maxTimeSecs = timeRemainingSecs
-                        isTimerRunning = false
-                        activeBlock = null
-                    }
-                    showEditTimerDialog = false
-                }) {
-                    Text("Set")
+            confirmButtonText = "Set",
+            onConfirm = {
+                val newDuration = customEditTimerMins.toIntOrNull()
+                if (newDuration != null && newDuration > 0) {
+                    timeRemainingSecs = newDuration * 60
+                    maxTimeSecs = timeRemainingSecs
+                    isTimerRunning = false
+                    activeBlock = null
                 }
+                showEditTimerDialog = false
             },
-            dismissButton = {
-                TextButton(onClick = { showEditTimerDialog = false }) {
-                    Text("Cancel")
-                }
-            }
+            dismissButtonText = "Cancel",
+            onDismiss = { showEditTimerDialog = false }
         )
     }
 
     if (blockToEdit != null) {
-        AlertDialog(
+        com.example.ui.components.IOSAlertDialog(
             onDismissRequest = { blockToEdit = null },
-            title = { Text("Edit Task") },
-            text = {
+            title = "Edit Task",
+            content = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = editBlockTitle,
@@ -645,24 +631,16 @@ fun RoomScreen(
                     )
                 }
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val duration = editBlockDuration.toIntOrNull() ?: 25
-                        if (editBlockTitle.isNotBlank()) {
-                            viewModel.updateTimeBlockDetails(blockToEdit!!, editBlockTitle.trim(), duration)
-                        }
-                        blockToEdit = null
-                    }
-                ) {
-                    Text("Save")
+            confirmButtonText = "Save",
+            onConfirm = {
+                val duration = editBlockDuration.toIntOrNull() ?: 25
+                if (editBlockTitle.isNotBlank()) {
+                    viewModel.updateTimeBlockDetails(blockToEdit!!, editBlockTitle.trim(), duration)
                 }
+                blockToEdit = null
             },
-            dismissButton = {
-                TextButton(onClick = { blockToEdit = null }) {
-                    Text("Cancel")
-                }
-            }
+            dismissButtonText = "Cancel",
+            onDismiss = { blockToEdit = null }
         )
     }
 }
