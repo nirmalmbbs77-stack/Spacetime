@@ -65,6 +65,7 @@ fun RoomScreen(
     var timeRemainingSecs by rememberSaveable { mutableStateOf(0) }
     var maxTimeSecs by rememberSaveable { mutableStateOf(0) }
     var isTimerRunning by rememberSaveable { mutableStateOf(false) }
+    var lastTickTime by rememberSaveable { mutableStateOf(0L) }
     var selectedTabIndex by rememberSaveable { mutableStateOf(0) }
     var showAddBlockDialog by remember { mutableStateOf(false) }
     var newBlockTitle by remember { mutableStateOf("") }
@@ -92,26 +93,43 @@ fun RoomScreen(
         }
     }
 
-    LaunchedEffect(isTimerRunning, timeRemainingSecs) {
-        if (isTimerRunning && timeRemainingSecs > 0) {
-            delay(1000L)
-            timeRemainingSecs -= 1
-        } else if (isTimerRunning && timeRemainingSecs == 0) {
-            isTimerRunning = false
-            // Mark block complete if needed
-            if (activeBlock != null) {
-                viewModel.completeBlock(activeBlock!!) 
-                notificationHelper.showTimerCompleteNotification(
-                    title = "Time's Up!", 
-                    message = "${activeBlock!!.title} is complete."
-                )
-            } else if (maxTimeSecs > 0) {
-                val manualTitle = if (maxTimeSecs == 25 * 60) "Focus Session" else if (maxTimeSecs == 5 * 60) "Short Break" else if (maxTimeSecs == 15 * 60) "Long Break" else "Timer"
-                notificationHelper.showTimerCompleteNotification(
-                    title = "Time's Up!", 
-                    message = "$manualTitle is complete."
-                )
+    LaunchedEffect(isTimerRunning) {
+        if (isTimerRunning) {
+            val now = System.currentTimeMillis()
+            if (lastTickTime == 0L || lastTickTime > now || (now - lastTickTime) > 86400000L) {
+                lastTickTime = now
             }
+            
+            while (timeRemainingSecs > 0 && isTimerRunning) {
+                delay(500L)
+                val currentNow = System.currentTimeMillis()
+                val elapsed = (currentNow - lastTickTime) / 1000L
+                if (elapsed >= 1) {
+                    timeRemainingSecs = maxOf(0, timeRemainingSecs - elapsed.toInt())
+                    lastTickTime += elapsed * 1000L
+                }
+            }
+            if (timeRemainingSecs <= 0 && isTimerRunning) {
+                timeRemainingSecs = 0
+                isTimerRunning = false
+                lastTickTime = 0L
+                // Mark block complete if needed
+                if (activeBlock != null) {
+                    viewModel.completeBlock(activeBlock) 
+                    notificationHelper.showTimerCompleteNotification(
+                        title = "Time's Up!", 
+                        message = "${activeBlock.title} is complete."
+                    )
+                } else if (maxTimeSecs > 0) {
+                    val manualTitle = if (maxTimeSecs == 25 * 60) "Focus Session" else if (maxTimeSecs == 5 * 60) "Short Break" else if (maxTimeSecs == 15 * 60) "Long Break" else "Timer"
+                    notificationHelper.showTimerCompleteNotification(
+                        title = "Time's Up!", 
+                        message = "$manualTitle is complete."
+                    )
+                }
+            }
+        } else {
+            lastTickTime = 0L
         }
     }
 
