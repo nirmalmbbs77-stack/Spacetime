@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +31,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.RoomEntity
 import com.example.viewmodel.SpaceTimeViewModel
+import androidx.compose.ui.platform.LocalContext
+import android.media.RingtoneManager
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Context
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +51,7 @@ fun HomeScreen(
     var promptText by remember { mutableStateOf("") }
 
     var showCreateRoomDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
     var newRoomName by remember { mutableStateOf("") }
     val colors = listOf(Color(0xFF00FFCC), Color(0xFFA200FF), Color(0xFFFF0080), Color(0xFFFFB800), Color(0xFF00E5FF))
     var selectedColor by remember { mutableStateOf(colors[0]) }
@@ -64,12 +72,17 @@ fun HomeScreen(
                     style = MaterialTheme.typography.displayMedium,
                     color = MaterialTheme.colorScheme.onBackground
                 )
-                IconButton(onClick = { viewModel.toggleTheme() }) {
-                    Icon(
-                        imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode,
-                        contentDescription = "Toggle Theme",
-                        tint = MaterialTheme.colorScheme.onBackground
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { viewModel.toggleTheme() }) {
+                        Icon(
+                            imageVector = if (isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode,
+                            contentDescription = "Toggle Theme",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                    IconButton(onClick = { showSettingsDialog = true }) {
+                        Icon(Icons.Filled.Settings, "Settings", tint = MaterialTheme.colorScheme.onBackground)
+                    }
                 }
             }
 
@@ -223,6 +236,10 @@ fun HomeScreen(
                 }
             )
         }
+
+        if (showSettingsDialog) {
+            SettingsDialog(onDismiss = { showSettingsDialog = false })
+        }
     }
 }
 
@@ -307,3 +324,116 @@ fun RoomCard(room: RoomEntity, onClick: () -> Unit) {
     }
 }
 
+@Composable
+fun SettingsDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val sharedPrefs = remember { context.getSharedPreferences("app_settings", Context.MODE_PRIVATE) }
+    
+    var syncAccount by remember { mutableStateOf(sharedPrefs.getString("sync_account", null)) }
+    var multiDeviceSync by remember { mutableStateOf(sharedPrefs.getBoolean("multi_device_sync", false)) }
+    var ringtoneUri by remember { mutableStateOf(sharedPrefs.getString("ringtone_uri", null)) }
+
+    val accountLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val accountName = result.data?.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME)
+            if (accountName != null) {
+                syncAccount = accountName
+                sharedPrefs.edit().putString("sync_account", accountName).apply()
+            }
+        }
+    }
+
+    val ringtoneLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri = result.data?.getParcelableExtra<android.net.Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            if (uri != null) {
+                ringtoneUri = uri.toString()
+                sharedPrefs.edit().putString("ringtone_uri", uri.toString()).apply()
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Settings") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Account Sync
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        val intent = android.accounts.AccountManager.newChooseAccountIntent(
+                            null, null, arrayOf("com.google"), null, null, null, null
+                        )
+                        accountLauncher.launch(intent)
+                    }.padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Google Account", style = MaterialTheme.typography.titleMedium)
+                        Text(syncAccount ?: "Not connected", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (syncAccount != null) {
+                        TextButton(onClick = { 
+                            syncAccount = null
+                            sharedPrefs.edit().remove("sync_account").apply()
+                        }) {
+                            Text("Disconnect")
+                        }
+                    }
+                }
+
+                // Multi Device Sync
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Multi-Device Sync", style = MaterialTheme.typography.titleMedium)
+                        Text("Keep data updated across devices", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = multiDeviceSync,
+                        onCheckedChange = { 
+                            multiDeviceSync = it 
+                            sharedPrefs.edit().putBoolean("multi_device_sync", it).apply()
+                        },
+                        enabled = syncAccount != null
+                    )
+                }
+
+                // Ringtone Chooser
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        val intent = android.content.Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                        }
+                        ringtoneLauncher.launch(intent)
+                    }.padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Notification Ringtone", style = MaterialTheme.typography.titleMedium)
+                        val ringtoneName = if (ringtoneUri != null) {
+                            RingtoneManager.getRingtone(context, android.net.Uri.parse(ringtoneUri)).getTitle(context) ?: "Unknown"
+                        } else "Default"
+                        Text(ringtoneName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}

@@ -59,7 +59,6 @@ fun RoomScreen(
     var showAddBlockDialog by remember { mutableStateOf(false) }
     var newBlockTitle by remember { mutableStateOf("") }
     var newBlockDuration by remember { mutableStateOf("") }
-    var isGlassmorphismEnabled by remember { mutableStateOf(false) }
     var showEditTimerDialog by remember { mutableStateOf(false) }
     var customEditTimerMins by remember { mutableStateOf("") }
 
@@ -118,13 +117,6 @@ fun RoomScreen(
         }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            if (isGlassmorphismEnabled) {
-                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawCircle(roomColor.copy(alpha = 0.4f), radius = size.width / 1.5f, center = androidx.compose.ui.geometry.Offset(0f, 0f))
-                    drawCircle(roomColor.copy(alpha = 0.2f), radius = size.width / 1.2f, center = androidx.compose.ui.geometry.Offset(size.width, size.height))
-                }
-            }
-
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -140,39 +132,28 @@ fun RoomScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(r.name, style = MaterialTheme.typography.titleLarge, color = roomColor)
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Glass", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onBackground)
-                    Switch(
-                        checked = isGlassmorphismEnabled,
-                        onCheckedChange = { isGlassmorphismEnabled = it },
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-
-            val glassModifier = if (isGlassmorphismEnabled) {
-                Modifier
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(Color.White.copy(alpha = 0.1f))
-                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(32.dp))
-            } else {
-                Modifier.background(MaterialTheme.colorScheme.surface, RoundedCornerShape(32.dp))
-            }
 
             // Timer Section
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.45f)
-                    .then(glassModifier)
-                    .padding(16.dp),
+                    .weight(0.55f)
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(32.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 56.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Box(
-                        modifier = Modifier.weight(1f).aspectRatio(1f),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .aspectRatio(1f),
                         contentAlignment = Alignment.Center
                     ) {
                         val progress = if (maxTimeSecs == 0) 0f
@@ -180,7 +161,7 @@ fun RoomScreen(
 
                         CircularProgressIndicator(
                             progress = { progress },
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize(0.85f),
                             color = roomColor,
                             trackColor = roomColor.copy(alpha = 0.1f),
                             strokeWidth = 10.dp,
@@ -194,8 +175,10 @@ fun RoomScreen(
 
                             Text(
                                 text = timeStr,
-                                style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp),
+                                style = MaterialTheme.typography.displayLarge.copy(fontSize = 58.sp),
                                 color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                softWrap = false,
                                 modifier = Modifier.clickable { 
                                     customEditTimerMins = displayMins.toString()
                                     showEditTimerDialog = true 
@@ -207,7 +190,7 @@ fun RoomScreen(
                                 color = roomColor
                             )
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
                             IconButton(
                                 onClick = {
@@ -228,32 +211,36 @@ fun RoomScreen(
                             }
                         }
                     }
+                }
                     
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                        TextButton(onClick = {
-                            activeBlock = null
-                            val duration = 25 * 60
-                            timeRemainingSecs = duration
-                            maxTimeSecs = duration
-                            isTimerRunning = false
-                        }) { Text("Focus", color = roomColor) }
-                        TextButton(onClick = {
-                            activeBlock = null
-                            val duration = 5 * 60
-                            timeRemainingSecs = duration
-                            maxTimeSecs = duration
-                            isTimerRunning = false
-                        }) { Text("Short Break", color = roomColor) }
-                        TextButton(onClick = {
-                            activeBlock = null
-                            val duration = 15 * 60
-                            timeRemainingSecs = duration
-                            maxTimeSecs = duration
-                            isTimerRunning = false
-                        }) { Text("Long Break", color = roomColor) }
-                    }
+                Row(
+                    horizontalArrangement = Arrangement.Center, 
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 8.dp)
+                ) {
+                    TextButton(onClick = {
+                        activeBlock = null
+                        val duration = 25 * 60
+                        timeRemainingSecs = duration
+                        maxTimeSecs = duration
+                        isTimerRunning = false
+                    }) { Text("Focus", color = roomColor) }
+                    TextButton(onClick = {
+                        activeBlock = null
+                        val duration = 5 * 60
+                        timeRemainingSecs = duration
+                        maxTimeSecs = duration
+                        isTimerRunning = false
+                    }) { Text("Short Break", color = roomColor) }
+                    TextButton(onClick = {
+                        activeBlock = null
+                        val duration = 15 * 60
+                        timeRemainingSecs = duration
+                        maxTimeSecs = duration
+                        isTimerRunning = false
+                    }) { Text("Long Break", color = roomColor) }
                 }
             }
 
@@ -302,7 +289,7 @@ fun RoomScreen(
         if (selectedTabIndex == 0) {
             // Time Blocks Timeline
             LazyColumn(
-                modifier = Modifier.weight(0.6f),
+                modifier = Modifier.weight(0.45f),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(timeBlocks) { block ->
@@ -352,7 +339,7 @@ fun RoomScreen(
             }
         } else {
             // Analytics View
-            Box(modifier = Modifier.weight(0.6f)) {
+            Box(modifier = Modifier.weight(0.45f)) {
                 com.example.ui.components.ProductivityChart(
                     roomColor = roomColor,
                     totalSessions = r.totalSessionsCompleted,

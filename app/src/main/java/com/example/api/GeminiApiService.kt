@@ -30,19 +30,8 @@ data class Part(
 )
 
 @Serializable
-data class ResponseFormat(
-    val text: ResponseFormatText? = null
-)
-
-@Serializable
-data class ResponseFormatText(
-    val mimeType: String,
-    val schema: JsonObject? = null
-)
-
-@Serializable
 data class GenerationConfig(
-    val responseFormat: ResponseFormat? = null,
+    val responseMimeType: String? = null,
     val temperature: Float? = null
 )
 

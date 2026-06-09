@@ -75,11 +75,7 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
                     systemInstruction = Content(parts = listOf(Part(text = "You are an AI for a futuristic space-themed pomodoro app. Output strictly standard JSON."))),
                     generationConfig = GenerationConfig(
                         temperature = 0.5f,
-                        responseFormat = ResponseFormat(
-                            text = ResponseFormatText(
-                                mimeType = "application/json"
-                            )
-                        )
+                        responseMimeType = "application/json"
                     )
                 )
 
