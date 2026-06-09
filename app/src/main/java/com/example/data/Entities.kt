@@ -15,7 +15,8 @@ data class RoomEntity(
     val shortBreakMin: Int = 5,
     val longBreakMin: Int = 15,
     val isCompleted: Boolean = false,
-    val totalSessionsCompleted: Int = 0
+    val totalSessionsCompleted: Int = 0,
+    val orderIndex: Int = 0
 )
 
 @Entity(

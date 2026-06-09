@@ -36,13 +36,33 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
 
     fun createManualRoom(name: String, colorArgb: Long, iconName: String = "Star") {
         viewModelScope.launch(Dispatchers.IO) {
+            val maxOrder = rooms.value.maxOfOrNull { it.orderIndex } ?: 0
             val newRoom = RoomEntity(
                 name = name,
                 colorArgb = colorArgb,
                 iconName = iconName,
-                totalSessionsCompleted = 0
+                totalSessionsCompleted = 0,
+                orderIndex = maxOrder + 1
             )
             repository.insertRoom(newRoom)
+        }
+    }
+
+    fun updateRoomOrder(orderedRooms: List<RoomEntity>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val updated = orderedRooms.mapIndexed { index, room ->
+                room.copy(orderIndex = index)
+            }
+            repository.updateRooms(updated)
+        }
+    }
+
+    fun updateTimeBlockOrder(orderedBlocks: List<TimeBlockEntity>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val updated = orderedBlocks.mapIndexed { index, block ->
+                block.copy(orderIndex = index)
+            }
+            repository.updateTimeBlocks(updated)
         }
     }
 

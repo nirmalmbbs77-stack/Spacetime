@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SpaceTimeDao {
-    @Query("SELECT * FROM rooms ORDER BY roomId DESC")
+    @Query("SELECT * FROM rooms ORDER BY orderIndex ASC, roomId DESC")
     fun getAllRooms(): Flow<List<RoomEntity>>
 
     @Query("SELECT * FROM rooms WHERE roomId = :id")
@@ -37,6 +37,12 @@ interface SpaceTimeDao {
 
     @Update
     suspend fun updateTimeBlock(block: TimeBlockEntity)
+
+    @Update
+    suspend fun updateTimeBlocks(blocks: List<TimeBlockEntity>)
+
+    @Update
+    suspend fun updateRooms(rooms: List<RoomEntity>)
 
     @Query("DELETE FROM time_blocks WHERE blockId = :id")
     suspend fun deleteTimeBlockById(id: Int)

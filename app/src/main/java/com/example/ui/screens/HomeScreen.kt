@@ -14,6 +14,9 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -70,6 +73,7 @@ fun HomeScreen(
     var importLink by remember { mutableStateOf("") }
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
     val context = androidx.compose.ui.platform.LocalContext.current
+    var isReorderMode by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
@@ -112,6 +116,41 @@ fun HomeScreen(
                     }
                     IconButton(onClick = { showSettingsDialog = true }) {
                         Icon(Icons.Filled.Settings, "Settings", tint = MaterialTheme.colorScheme.onBackground)
+                    }
+                }
+            }
+
+            if (isReorderMode) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Reorder Mode Active", 
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                "Tap arrow keys to reorder. Double tap any card to save & exit.", 
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                        Button(
+                            onClick = { isReorderMode = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("Done", style = MaterialTheme.typography.labelLarge)
+                        }
                     }
                 }
             }
@@ -159,6 +198,28 @@ fun HomeScreen(
                     items(rooms) { room ->
                         RoomCard(
                             room = room,
+                            isReorderMode = isReorderMode,
+                            onMoveUp = {
+                                val idx = rooms.indexOf(room)
+                                if (idx > 0) {
+                                    val mutable = rooms.toMutableList()
+                                    val temp = mutable[idx]
+                                    mutable[idx] = mutable[idx - 1]
+                                    mutable[idx - 1] = temp
+                                    viewModel.updateRoomOrder(mutable)
+                                }
+                            },
+                            onMoveDown = {
+                                val idx = rooms.indexOf(room)
+                                if (idx != -1 && idx < rooms.size - 1) {
+                                    val mutable = rooms.toMutableList()
+                                    val temp = mutable[idx]
+                                    mutable[idx] = mutable[idx + 1]
+                                    mutable[idx + 1] = temp
+                                    viewModel.updateRoomOrder(mutable)
+                                }
+                            },
+                            onDoubleClick = { isReorderMode = !isReorderMode },
                             onClick = { onNavigateToRoom(room.roomId) },
                             onEdit = { 
                                 roomToEdit = room
@@ -415,7 +476,16 @@ fun HomeScreen(
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun RoomCard(room: RoomEntity, onClick: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
+fun RoomCard(
+    room: RoomEntity,
+    isReorderMode: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onClick: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onDoubleClick: () -> Unit
+) {
     val roomColor = Color(room.colorArgb.toInt())
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -444,8 +514,9 @@ fun RoomCard(room: RoomEntity, onClick: () -> Unit, onEdit: () -> Unit, onDelete
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onClick,
-                onLongClick = onEdit
+                onClick = { if (!isReorderMode) onClick() },
+                onLongClick = { if (!isReorderMode) onEdit() },
+                onDoubleClick = onDoubleClick
             )
             .padding(16.dp)
     ) {
@@ -468,10 +539,12 @@ fun RoomCard(room: RoomEntity, onClick: () -> Unit, onEdit: () -> Unit, onDelete
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete Room", tint = roomColor)
+                    if (!isReorderMode) {
+                        IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Delete Room", tint = roomColor)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(32.dp)) {
                         val progress = ((room.totalSessionsCompleted % 10) / 10f).coerceAtLeast(0.1f)
                         CircularProgressIndicator(
@@ -497,6 +570,60 @@ fun RoomCard(room: RoomEntity, onClick: () -> Unit, onEdit: () -> Unit, onDelete
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+
+        if (isReorderMode) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+                    .clickable(enabled = false) {} // block click propagation
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    IconButton(
+                        onClick = onMoveUp,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(roomColor.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Filled.KeyboardArrowUp,
+                            contentDescription = "Move Room Up",
+                            tint = roomColor,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Icon(
+                        Icons.Filled.Menu,
+                        contentDescription = "Reorder Handle Icon",
+                        tint = roomColor.copy(alpha = 0.6f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    IconButton(
+                        onClick = onMoveDown,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(roomColor.copy(alpha = 0.15f), androidx.compose.foundation.shape.CircleShape)
+                    ) {
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = "Move Room Down",
+                            tint = roomColor,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
             }
         }
     }

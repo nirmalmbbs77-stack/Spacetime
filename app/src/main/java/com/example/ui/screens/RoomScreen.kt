@@ -23,6 +23,9 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -87,6 +90,7 @@ fun RoomScreen(
     var editBlockDuration by remember { mutableStateOf("") }
     var editBlockColor by remember { mutableStateOf(Color(0xFFFFFFFF)) }
     var showEditCustomBlockColorPicker by remember { mutableStateOf(false) }
+    var isReorderMode by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val notificationHelper = remember { com.example.util.NotificationHelper(context) }
@@ -433,6 +437,41 @@ fun RoomScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         if (selectedTabIndex == 0) {
+            if (isReorderMode) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = roomColor.copy(alpha = 0.15f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Reorder Tasks Active", 
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                "Tap arrows to shift tasks. Double tap any row to save & exit.", 
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Button(
+                            onClick = { isReorderMode = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = roomColor)
+                        ) {
+                            Text("Done", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                        }
+                    }
+                }
+            }
+
             // Minimalist iOS 26 Glassy Timeline
             val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
             LazyColumn(
@@ -479,17 +518,24 @@ fun RoomScreen(
                             .border(0.5.dp, cardBorder, RoundedCornerShape(20.dp))
                             .combinedClickable(
                                 onClick = {
-                                    activeBlockId = block.blockId
-                                    val duration = block.durationMin * 60
-                                    timeRemainingSecs = duration
-                                    maxTimeSecs = duration
-                                    isTimerRunning = false
+                                    if (!isReorderMode) {
+                                        activeBlockId = block.blockId
+                                        val duration = block.durationMin * 60
+                                        timeRemainingSecs = duration
+                                        maxTimeSecs = duration
+                                        isTimerRunning = false
+                                    }
                                 },
                                 onLongClick = {
-                                    blockToEdit = block
-                                    editBlockTitle = block.title
-                                    editBlockDuration = block.durationMin.toString()
-                                    editBlockColor = Color(block.colorArgb.toInt())
+                                    if (!isReorderMode) {
+                                        blockToEdit = block
+                                        editBlockTitle = block.title
+                                        editBlockDuration = block.durationMin.toString()
+                                        editBlockColor = Color(block.colorArgb.toInt())
+                                    }
+                                },
+                                onDoubleClick = {
+                                    isReorderMode = !isReorderMode
                                 }
                             )
                             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -503,7 +549,7 @@ fun RoomScreen(
                                     scaleY = checkScale
                                 )
                                 .clip(RoundedCornerShape(6.dp))
-                                .clickable { 
+                                .clickable(enabled = !isReorderMode) { 
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     viewModel.completeBlock(block) 
                                 }
@@ -551,16 +597,72 @@ fun RoomScreen(
                             )
                         }
                         
-                        IconButton(
-                            onClick = { viewModel.deleteBlock(block) },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Delete, 
-                                contentDescription = "Delete", 
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.size(18.dp)
-                            )
+                        if (isReorderMode) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        val idx = timeBlocks.indexOf(block)
+                                        if (idx > 0) {
+                                            val mutable = timeBlocks.toMutableList()
+                                            val temp = mutable[idx]
+                                            mutable[idx] = mutable[idx - 1]
+                                            mutable[idx - 1] = temp
+                                            viewModel.updateTimeBlockOrder(mutable)
+                                        }
+                                    },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.KeyboardArrowUp,
+                                        contentDescription = "Move Up",
+                                        tint = roomColor,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                
+                                Icon(
+                                    imageVector = Icons.Filled.Menu,
+                                    contentDescription = "Reorder Drag Handle",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+
+                                IconButton(
+                                    onClick = {
+                                        val idx = timeBlocks.indexOf(block)
+                                        if (idx != -1 && idx < timeBlocks.size - 1) {
+                                            val mutable = timeBlocks.toMutableList()
+                                            val temp = mutable[idx]
+                                            mutable[idx] = mutable[idx + 1]
+                                            mutable[idx + 1] = temp
+                                            viewModel.updateTimeBlockOrder(mutable)
+                                        }
+                                    },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.KeyboardArrowDown,
+                                        contentDescription = "Move Down",
+                                        tint = roomColor,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                        } else {
+                            IconButton(
+                                onClick = { viewModel.deleteBlock(block) },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Delete, 
+                                    contentDescription = "Delete", 
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }
