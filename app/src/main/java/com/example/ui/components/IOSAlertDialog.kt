@@ -19,8 +19,8 @@ fun IOSAlertDialog(
     onDismissRequest: () -> Unit,
     confirmButtonText: String,
     onConfirm: () -> Unit,
-    dismissButtonText: String,
-    onDismiss: () -> Unit,
+    dismissButtonText: String? = null,
+    onDismiss: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     Dialog(onDismissRequest = onDismissRequest) {
@@ -54,14 +54,16 @@ fun IOSAlertDialog(
                 
                 // Action Buttons
                 Row(modifier = Modifier.fillMaxWidth().height(44.dp)) {
-                    TextButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                        shape = RoundedCornerShape(0.dp)
-                    ) {
-                        Text(dismissButtonText, color = Color(0xFF0A84FF), fontSize = 17.sp)
+                    if (dismissButtonText != null && onDismiss != null) {
+                        TextButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            shape = RoundedCornerShape(0.dp)
+                        ) {
+                            Text(dismissButtonText, color = Color(0xFF0A84FF), fontSize = 17.sp)
+                        }
+                        VerticalDivider(thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.3f))
                     }
-                    VerticalDivider(thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.3f))
                     TextButton(
                         onClick = onConfirm,
                         modifier = Modifier.weight(1f).fillMaxHeight(),

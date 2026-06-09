@@ -39,6 +39,7 @@ import kotlinx.coroutines.delay
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.runtime.saveable.rememberSaveable
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -57,11 +58,14 @@ fun RoomScreen(
         return
     }
 
-    var activeBlock by remember { mutableStateOf<TimeBlockEntity?>(null) }
-    var timeRemainingSecs by remember { mutableStateOf(0) }
-    var maxTimeSecs by remember { mutableStateOf(0) }
-    var isTimerRunning by remember { mutableStateOf(false) }
-    var selectedTabIndex by remember { mutableStateOf(0) }
+    var activeBlockId by rememberSaveable { mutableStateOf(-1) }
+    val activeBlock = remember(activeBlockId, timeBlocks) { 
+        if (activeBlockId != -1) timeBlocks.find { it.blockId == activeBlockId } else null 
+    }
+    var timeRemainingSecs by rememberSaveable { mutableStateOf(0) }
+    var maxTimeSecs by rememberSaveable { mutableStateOf(0) }
+    var isTimerRunning by rememberSaveable { mutableStateOf(false) }
+    var selectedTabIndex by rememberSaveable { mutableStateOf(0) }
     var showAddBlockDialog by remember { mutableStateOf(false) }
     var newBlockTitle by remember { mutableStateOf("") }
     var newBlockDuration by remember { mutableStateOf("") }
@@ -292,21 +296,21 @@ fun RoomScreen(
                         .padding(bottom = 8.dp)
                 ) {
                     TextButton(onClick = {
-                        activeBlock = null
+                        activeBlockId = -1
                         val duration = 25 * 60
                         timeRemainingSecs = duration
                         maxTimeSecs = duration
                         isTimerRunning = false
                     }) { Text("Focus", color = roomColor) }
                     TextButton(onClick = {
-                        activeBlock = null
+                        activeBlockId = -1
                         val duration = 5 * 60
                         timeRemainingSecs = duration
                         maxTimeSecs = duration
                         isTimerRunning = false
                     }) { Text("Short Break", color = roomColor) }
                     TextButton(onClick = {
-                        activeBlock = null
+                        activeBlockId = -1
                         val duration = 15 * 60
                         timeRemainingSecs = duration
                         maxTimeSecs = duration
@@ -314,8 +318,6 @@ fun RoomScreen(
                     }) { Text("Long Break", color = roomColor) }
                 }
             }
-
-        var selectedTabIndex by remember { mutableStateOf(0) }
 
         Spacer(modifier = Modifier.height(24.dp))
         Row(
@@ -429,7 +431,7 @@ fun RoomScreen(
                             .border(0.5.dp, cardBorder, RoundedCornerShape(20.dp))
                             .combinedClickable(
                                 onClick = {
-                                    activeBlock = block
+                                    activeBlockId = block.blockId
                                     val duration = block.durationMin * 60
                                     timeRemainingSecs = duration
                                     maxTimeSecs = duration
@@ -599,7 +601,7 @@ fun RoomScreen(
                     timeRemainingSecs = newDuration * 60
                     maxTimeSecs = timeRemainingSecs
                     isTimerRunning = false
-                    activeBlock = null
+                    activeBlockId = -1
                 }
                 showEditTimerDialog = false
             },

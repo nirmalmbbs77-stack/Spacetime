@@ -495,10 +495,37 @@ fun SettingsDialog(onDismiss: () -> Unit) {
         }
     }
 
-    AlertDialog(
+    var showAboutDialog by remember { mutableStateOf(false) }
+
+    if (showAboutDialog) {
+        com.example.ui.components.IOSAlertDialog(
+            title = "About SpaceTime",
+            onDismissRequest = { showAboutDialog = false },
+            confirmButtonText = "Close",
+            onConfirm = { showAboutDialog = false },
+            content = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "SpaceTime is a productivity timer designed to help you focus. " +
+                        "Create rooms to organize tasks, set durations, and keep track of your " +
+                        "progress as time flows. Customize room colors and create focus time blocks to stay on track.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        )
+    }
+
+    com.example.ui.components.IOSAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Settings") },
-        text = {
+        title = "Settings",
+        confirmButtonText = "Close",
+        onConfirm = onDismiss,
+        content = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 // Account Sync
                 Row(
@@ -566,11 +593,20 @@ fun SettingsDialog(onDismiss: () -> Unit) {
                         Text(ringtoneName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
+                
+                // About Section
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        showAboutDialog = true
+                    }.padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("About SpaceTime", style = MaterialTheme.typography.titleMedium)
+                        Text("View app details and how to use", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
         }
     )
