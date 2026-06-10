@@ -135,13 +135,21 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
         }
     }
 
-    fun createImportedRoom(name: String, colorArgb: Long, blocksArray: org.json.JSONArray) {
+    fun createImportedRoomFromJson(jsonObj: org.json.JSONObject) {
         viewModelScope.launch(Dispatchers.IO) {
+            val name = jsonObj.getString("name")
+            val colorArgb = jsonObj.getLong("colorArgb")
+            val blocksArray = jsonObj.getJSONArray("blocks")
+            
             val newRoom = RoomEntity(
                 name = name,
                 colorArgb = colorArgb,
                 iconName = "Star",
-                totalSessionsCompleted = 0
+                isCompleted = jsonObj.optBoolean("isCompleted", false),
+                totalSessionsCompleted = jsonObj.optInt("totalSessionsCompleted", 0),
+                totalTimeLeft = jsonObj.optInt("totalTimeLeft", 0),
+                totalOvertime = jsonObj.optInt("totalOvertime", 0),
+                timeBank = jsonObj.optInt("timeBank", 0)
             )
             val newRoomId = repository.insertRoom(newRoom).toInt()
             for (i in 0 until blocksArray.length()) {
@@ -154,7 +162,13 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
                     title = title,
                     durationMin = duration,
                     orderIndex = i,
-                    colorArgb = color
+                    colorArgb = color,
+                    isCompleted = blockObj.optBoolean("isCompleted", false),
+                    assignedTime = blockObj.optInt("assignedTime", 0),
+                    timeTaken = blockObj.optInt("timeTaken", 0),
+                    timeLeft = blockObj.optInt("timeLeft", 0),
+                    overtime = blockObj.optInt("overtime", 0),
+                    completedAt = blockObj.optLong("completedAt", 0L)
                 ))
             }
         }
@@ -283,7 +297,8 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
             repository.updateTimeBlock(updatedBlock)
             
             if (updatedBlock.isCompleted) {
-                val updatedTotalTimeLeft = room.totalTimeLeft + timeLeftSecs
+                val addedTimeLeft = if (timeTakenSecs > 0) timeLeftSecs else 0
+                val updatedTotalTimeLeft = room.totalTimeLeft + addedTimeLeft
                 val updatedTotalOvertime = room.totalOvertime + overtimeSecs
                 val newTimeBank = updatedTotalTimeLeft - updatedTotalOvertime
                 

@@ -343,11 +343,9 @@ fun HomeScreen(
                                         val jsonStr = String(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT))
                                         val jsonObj = org.json.JSONObject(jsonStr)
                                         
-                                        val rName = jsonObj.getString("name")
-                                        val rColor = jsonObj.getLong("colorArgb")
-                                        val blocks = jsonObj.getJSONArray("blocks")
+                                        val rName = jsonObj.getString("name") // validation step
                                         
-                                        viewModel.createImportedRoom(rName, rColor, blocks)
+                                        viewModel.createImportedRoomFromJson(jsonObj)
                                         
                                         showCreateRoomDialog = false
                                         importLink = ""

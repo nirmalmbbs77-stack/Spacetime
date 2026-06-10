@@ -77,6 +77,7 @@ fun RoomScreen(
     val isOvertime by viewModel.isOvertime.collectAsStateWithLifecycle()
     val maxTimeSecs by viewModel.maxTimeSecs.collectAsStateWithLifecycle()
     val isTimerRunning by viewModel.isTimerRunning.collectAsStateWithLifecycle()
+    var showShareDialog by remember { mutableStateOf(false) }
     var selectedTabIndex by rememberSaveable { mutableStateOf(0) }
     var showAddBlockDialog by remember { mutableStateOf(false) }
     var newBlockTitle by remember { mutableStateOf("") }
@@ -95,6 +96,7 @@ fun RoomScreen(
     var isReorderMode by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val notificationHelper = remember { com.example.util.NotificationHelper(context) }
     
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -220,21 +222,7 @@ fun RoomScreen(
                     }
                 }
                 
-                val clipboardManager = LocalClipboardManager.current
-                IconButton(onClick = {
-                    val shareStr = """
-                        {
-                            "name": "${r.name}",
-                            "colorArgb": ${r.colorArgb},
-                            "blocks": ${timeBlocks.joinToString(prefix = "[", postfix = "]") {
-                                "{\"title\": \"${it.title}\", \"durationMin\": ${it.durationMin}, \"colorArgb\": ${it.colorArgb}}"
-                            }}
-                        }
-                    """.trimIndent()
-                    val encoded = android.util.Base64.encodeToString(shareStr.toByteArray(), android.util.Base64.NO_WRAP)
-                    clipboardManager.setText(AnnotatedString("spacetime://$encoded"))
-                    android.widget.Toast.makeText(context, "Room link copied!", android.widget.Toast.LENGTH_SHORT).show()
-                }) {
+                IconButton(onClick = { showShareDialog = true }) {
                     Icon(Icons.Filled.Share, contentDescription = "Share Room", tint = roomColor)
                 }
             }
@@ -943,6 +931,69 @@ fun RoomScreen(
             },
             dismissButtonText = "Cancel",
             onDismiss = { blockToEdit = null }
+        )
+    }
+
+    if (showShareDialog && r != null) {
+        com.example.ui.components.IOSAlertDialog(
+            onDismissRequest = { showShareDialog = false },
+            title = "Share Options",
+            content = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("How would you like to share this room?", style = MaterialTheme.typography.bodyMedium)
+                    
+                    Button(
+                        onClick = {
+                            val blocksJson = timeBlocks.joinToString(prefix = "[", postfix = "]") {
+                                "{\"title\": \"${it.title}\", \"durationMin\": ${it.durationMin}, \"colorArgb\": ${it.colorArgb}}"
+                            }
+                            val shareStr = """
+                                {
+                                    "name": "${r.name}",
+                                    "colorArgb": ${r.colorArgb},
+                                    "blocks": $blocksJson
+                                }
+                            """.trimIndent()
+                            val encoded = android.util.Base64.encodeToString(shareStr.toByteArray(), android.util.Base64.NO_WRAP)
+                            clipboardManager.setText(AnnotatedString("spacetime://$encoded"))
+                            android.widget.Toast.makeText(context, "Clean room link copied!", android.widget.Toast.LENGTH_SHORT).show()
+                            showShareDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Clean Room Structure")
+                    }
+
+                    Button(
+                        onClick = {
+                            val blocksJson = timeBlocks.joinToString(prefix = "[", postfix = "]") {
+                                "{\"title\": \"${it.title}\", \"durationMin\": ${it.durationMin}, \"colorArgb\": ${it.colorArgb}, \"isCompleted\": ${it.isCompleted}, \"assignedTime\": ${it.assignedTime}, \"timeTaken\": ${it.timeTaken}, \"timeLeft\": ${it.timeLeft}, \"overtime\": ${it.overtime}, \"completedAt\": ${it.completedAt}}"
+                            }
+                            val shareStr = """
+                                {
+                                    "name": "${r.name}",
+                                    "colorArgb": ${r.colorArgb},
+                                    "isCompleted": ${r.isCompleted},
+                                    "totalSessionsCompleted": ${r.totalSessionsCompleted},
+                                    "totalTimeLeft": ${r.totalTimeLeft},
+                                    "totalOvertime": ${r.totalOvertime},
+                                    "timeBank": ${r.timeBank},
+                                    "blocks": $blocksJson
+                                }
+                            """.trimIndent()
+                            val encoded = android.util.Base64.encodeToString(shareStr.toByteArray(), android.util.Base64.NO_WRAP)
+                            clipboardManager.setText(AnnotatedString("spacetime://$encoded"))
+                            android.widget.Toast.makeText(context, "Progressed room link copied!", android.widget.Toast.LENGTH_SHORT).show()
+                            showShareDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Include All Progress")
+                    }
+                }
+            },
+            confirmButtonText = "Cancel",
+            onConfirm = { showShareDialog = false }
         )
     }
 
