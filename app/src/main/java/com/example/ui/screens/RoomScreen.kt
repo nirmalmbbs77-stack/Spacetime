@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -67,14 +68,15 @@ fun RoomScreen(
         return
     }
 
-    var activeBlockId by rememberSaveable { mutableStateOf(-1) }
+    val activeBlockId by viewModel.activeBlockId.collectAsStateWithLifecycle()
     val activeBlock = remember(activeBlockId, timeBlocks) { 
         if (activeBlockId != -1) timeBlocks.find { it.blockId == activeBlockId } else null 
     }
-    var timeRemainingSecs by rememberSaveable { mutableStateOf(0) }
-    var maxTimeSecs by rememberSaveable { mutableStateOf(0) }
-    var isTimerRunning by rememberSaveable { mutableStateOf(false) }
-    var lastTickTime by rememberSaveable { mutableStateOf(0L) }
+    val timeRemainingSecs by viewModel.timeRemainingSecs.collectAsStateWithLifecycle()
+    val overtimeSecs by viewModel.overtimeSecs.collectAsStateWithLifecycle()
+    val isOvertime by viewModel.isOvertime.collectAsStateWithLifecycle()
+    val maxTimeSecs by viewModel.maxTimeSecs.collectAsStateWithLifecycle()
+    val isTimerRunning by viewModel.isTimerRunning.collectAsStateWithLifecycle()
     var selectedTabIndex by rememberSaveable { mutableStateOf(0) }
     var showAddBlockDialog by remember { mutableStateOf(false) }
     var newBlockTitle by remember { mutableStateOf("") }
@@ -107,43 +109,9 @@ fun RoomScreen(
         }
     }
 
-    LaunchedEffect(isTimerRunning) {
-        if (isTimerRunning) {
-            val now = System.currentTimeMillis()
-            if (lastTickTime == 0L || lastTickTime > now || (now - lastTickTime) > 86400000L) {
-                lastTickTime = now
-            }
-            
-            while (timeRemainingSecs > 0 && isTimerRunning) {
-                delay(500L)
-                val currentNow = System.currentTimeMillis()
-                val elapsed = (currentNow - lastTickTime) / 1000L
-                if (elapsed >= 1) {
-                    timeRemainingSecs = maxOf(0, timeRemainingSecs - elapsed.toInt())
-                    lastTickTime += elapsed * 1000L
-                }
-            }
-            if (timeRemainingSecs <= 0 && isTimerRunning) {
-                timeRemainingSecs = 0
-                isTimerRunning = false
-                lastTickTime = 0L
-                // Mark block complete if needed
-                if (activeBlock != null) {
-                    viewModel.completeBlock(activeBlock) 
-                    notificationHelper.showTimerCompleteNotification(
-                        title = "Time's Up!", 
-                        message = "${activeBlock.title} is complete."
-                    )
-                } else if (maxTimeSecs > 0) {
-                    val manualTitle = if (maxTimeSecs == 25 * 60) "Focus Session" else if (maxTimeSecs == 5 * 60) "Short Break" else if (maxTimeSecs == 15 * 60) "Long Break" else "Timer"
-                    notificationHelper.showTimerCompleteNotification(
-                        title = "Time's Up!", 
-                        message = "$manualTitle is complete."
-                    )
-                }
-            }
-        } else {
-            lastTickTime = 0L
+    LaunchedEffect(Unit) {
+        viewModel.onTimerCompleteNotification = { titleMsg, msg ->
+            notificationHelper.showTimerCompleteNotification(titleMsg, msg)
         }
     }
 
@@ -231,7 +199,25 @@ fun RoomScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(r.name, style = MaterialTheme.typography.titleLarge, color = roomColor)
+                    Column {
+                        Text(r.name, style = MaterialTheme.typography.titleLarge, color = roomColor)
+                        val tbMins = r.timeBank / 60
+                        val tbSign = if (r.timeBank > 0) "+" else if (r.timeBank < 0) "-" else ""
+                        val tbColor = if (r.timeBank > 0) Color(0xFF2E7D32) else if (r.timeBank < 0) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "TimeBank: $tbSign${kotlin.math.abs(tbMins)} min",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = tbColor
+                            )
+                            val totalAssignedMins = timeBlocks.sumOf { it.durationMin }
+                            Text(
+                                text = "Total: $totalAssignedMins min",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
                 
                 val clipboardManager = LocalClipboardManager.current
@@ -296,45 +282,87 @@ fun RoomScreen(
                         )
 
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            val displaySecs = timeRemainingSecs % 60
-                            val displayMins = timeRemainingSecs / 60
+                            val displayTime = if (isOvertime) overtimeSecs else timeRemainingSecs
+                            val displaySecs = displayTime % 60
+                            val displayMins = displayTime / 60
                             val timeStr = String.format("%02d:%02d", displayMins, displaySecs)
+                            val textColor = if (isOvertime) Color.Red else MaterialTheme.colorScheme.onSurface
+                            val titleColor = if (isOvertime) Color.Red else roomColor
 
                             Text(
-                                text = timeStr,
+                                text = if (isOvertime) "+$timeStr" else timeStr,
                                 style = MaterialTheme.typography.displayLarge.copy(fontSize = 55.sp),
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = textColor,
                                 maxLines = 1,
                                 softWrap = false,
                                 modifier = Modifier.clickable { 
-                                    customEditTimerMins = displayMins.toString()
-                                    showEditTimerDialog = true 
+                                    if (!isOvertime) {
+                                        customEditTimerMins = displayMins.toString()
+                                        showEditTimerDialog = true 
+                                    }
                                 }
                             )
+                            if (isOvertime) {
+                                Text(
+                                    text = "OVERTIME",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 2.sp),
+                                    color = Color.Red
+                                )
+                            }
                             Text(
                                 text = activeBlock?.title ?: if (maxTimeSecs == 25 * 60) "Focus Session" else if (maxTimeSecs == 5 * 60) "Short Break" else if (maxTimeSecs == 15 * 60) "Long Break" else "Select a Block",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = roomColor
+                                color = titleColor
                             )
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            IconButton(
-                                onClick = {
-                                    if (activeBlock != null || timeRemainingSecs > 0) {
-                                        isTimerRunning = !isTimerRunning
-                                    }
-                                },
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .background(roomColor.copy(alpha = 0.2f), CircleShape)
-                            ) {
-                                Icon(
-                                    if (isTimerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                    contentDescription = "Play/Pause",
-                                    tint = roomColor,
-                                    modifier = Modifier.size(32.dp)
-                                )
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                IconButton(
+                                    onClick = {
+                                        if (activeBlock != null || timeRemainingSecs > 0 || isOvertime) {
+                                            viewModel.toggleTimer()
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .background(roomColor.copy(alpha = 0.2f), CircleShape)
+                                ) {
+                                    Icon(
+                                        if (isTimerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                        contentDescription = "Play/Pause",
+                                        tint = roomColor,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+                                
+                                IconButton(
+                                    onClick = {
+                                        if (activeBlock != null) {
+                                            val assignedSecs = activeBlock.durationMin * 60
+                                            val tLeft = if (!isOvertime) timeRemainingSecs else 0
+                                            val tTaken = assignedSecs - tLeft
+                                            val oTime = if (isOvertime) overtimeSecs else 0
+                                            viewModel.recordTaskCompletion(r, activeBlock, tTaken, oTime)
+                                        } else if (maxTimeSecs > 0) {
+                                            val tLeft = if (!isOvertime) timeRemainingSecs else 0
+                                            val tTaken = maxTimeSecs - tLeft
+                                            val oTime = if (isOvertime) overtimeSecs else 0
+                                            viewModel.recordManualSessionCompletion(r, maxTimeSecs, tTaken, oTime)
+                                        }
+                                        viewModel.resetTimerState()
+                                    },
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .background(Color.Red.copy(alpha = 0.15f), CircleShape)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Stop,
+                                        contentDescription = "Stop Formally",
+                                        tint = Color.Red,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -348,25 +376,31 @@ fun RoomScreen(
                         .padding(bottom = 8.dp)
                 ) {
                     TextButton(onClick = {
-                        activeBlockId = -1
+                        viewModel.activeBlockId.value = -1
                         val duration = 25 * 60
-                        timeRemainingSecs = duration
-                        maxTimeSecs = duration
-                        isTimerRunning = false
+                        viewModel.timeRemainingSecs.value = duration
+                        viewModel.maxTimeSecs.value = duration
+                        viewModel.isOvertime.value = false
+                        viewModel.overtimeSecs.value = 0
+                        viewModel.stopTimer()
                     }) { Text("Focus", color = roomColor) }
                     TextButton(onClick = {
-                        activeBlockId = -1
+                        viewModel.activeBlockId.value = -1
                         val duration = 5 * 60
-                        timeRemainingSecs = duration
-                        maxTimeSecs = duration
-                        isTimerRunning = false
+                        viewModel.timeRemainingSecs.value = duration
+                        viewModel.maxTimeSecs.value = duration
+                        viewModel.isOvertime.value = false
+                        viewModel.overtimeSecs.value = 0
+                        viewModel.stopTimer()
                     }) { Text("Short Break", color = roomColor) }
                     TextButton(onClick = {
-                        activeBlockId = -1
+                        viewModel.activeBlockId.value = -1
                         val duration = 15 * 60
-                        timeRemainingSecs = duration
-                        maxTimeSecs = duration
-                        isTimerRunning = false
+                        viewModel.timeRemainingSecs.value = duration
+                        viewModel.maxTimeSecs.value = duration
+                        viewModel.isOvertime.value = false
+                        viewModel.overtimeSecs.value = 0
+                        viewModel.stopTimer()
                     }) { Text("Long Break", color = roomColor) }
                 }
             }
@@ -519,11 +553,13 @@ fun RoomScreen(
                             .combinedClickable(
                                 onClick = {
                                     if (!isReorderMode) {
-                                        activeBlockId = block.blockId
+                                        viewModel.activeBlockId.value = block.blockId
                                         val duration = block.durationMin * 60
-                                        timeRemainingSecs = duration
-                                        maxTimeSecs = duration
-                                        isTimerRunning = false
+                                        viewModel.timeRemainingSecs.value = duration
+                                        viewModel.maxTimeSecs.value = duration
+                                        viewModel.isOvertime.value = false
+                                        viewModel.overtimeSecs.value = 0
+                                        viewModel.stopTimer()
                                     }
                                 },
                                 onLongClick = {
@@ -551,7 +587,17 @@ fun RoomScreen(
                                 .clip(RoundedCornerShape(6.dp))
                                 .clickable(enabled = !isReorderMode) { 
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    viewModel.completeBlock(block) 
+                                    val isActive = activeBlockId == block.blockId
+                                    val assignedSecs = block.durationMin * 60
+                                    val tLeft = if (isActive && !isOvertime) timeRemainingSecs else if (isActive && isOvertime) 0 else assignedSecs
+                                    val tTaken = assignedSecs - tLeft
+                                    val oTime = if (isActive && isOvertime) overtimeSecs else 0
+                                    
+                                    viewModel.recordTaskCompletion(r, block, tTaken, oTime)
+                                    
+                                    if (isActive) {
+                                        viewModel.resetTimerState()
+                                    }
                                 }
                                 .background(
                                     if (isCompleted) roomColor else Color.Transparent, 
@@ -801,10 +847,12 @@ fun RoomScreen(
             onConfirm = {
                 val newDuration = customEditTimerMins.toIntOrNull()
                 if (newDuration != null && newDuration > 0) {
-                    timeRemainingSecs = newDuration * 60
-                    maxTimeSecs = timeRemainingSecs
-                    isTimerRunning = false
-                    activeBlockId = -1
+                    viewModel.timeRemainingSecs.value = newDuration * 60
+                    viewModel.maxTimeSecs.value = viewModel.timeRemainingSecs.value
+                    viewModel.isOvertime.value = false
+                    viewModel.overtimeSecs.value = 0
+                    viewModel.stopTimer()
+                    viewModel.activeBlockId.value = -1
                 }
                 showEditTimerDialog = false
             },

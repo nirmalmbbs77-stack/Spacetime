@@ -16,7 +16,10 @@ data class RoomEntity(
     val longBreakMin: Int = 15,
     val isCompleted: Boolean = false,
     val totalSessionsCompleted: Int = 0,
-    val orderIndex: Int = 0
+    val orderIndex: Int = 0,
+    val totalTimeLeft: Int = 0,
+    val totalOvertime: Int = 0,
+    val timeBank: Int = 0
 )
 
 @Entity(
@@ -38,5 +41,11 @@ data class TimeBlockEntity(
     val durationMin: Int,
     val isCompleted: Boolean = false,
     val orderIndex: Int = 0,
-    val colorArgb: Long = 0xFFFFFFFF // White default for task independent colors
+    val colorArgb: Long = 0xFFFFFFFF, // White default for task independent colors
+    val assignedTime: Int = 0,
+    val timeTaken: Int = 0,
+    val timeLeft: Int = 0,
+    val overtime: Int = 0,
+    val completedAt: Long = 0L,
+    val overtimeStartedAt: Long = 0L
 )

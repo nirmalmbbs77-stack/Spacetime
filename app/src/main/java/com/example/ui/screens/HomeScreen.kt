@@ -196,8 +196,11 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(rooms) { room ->
+                        val timeBlocks by viewModel.getTimeBlocks(room.roomId).collectAsStateWithLifecycle(emptyList())
+                        val totalAssignedMins = timeBlocks.sumOf { it.durationMin }
                         RoomCard(
                             room = room,
+                            totalAssignedMins = totalAssignedMins,
                             isReorderMode = isReorderMode,
                             onMoveUp = {
                                 val idx = rooms.indexOf(room)
@@ -478,6 +481,7 @@ fun HomeScreen(
 @Composable
 fun RoomCard(
     room: RoomEntity,
+    totalAssignedMins: Int,
     isReorderMode: Boolean,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
@@ -496,7 +500,7 @@ fun RoomCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(1f)
+            .height(180.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -569,6 +573,19 @@ fun RoomCard(
                     text = "${room.totalSessionsCompleted} Sessions",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Total Time: $totalAssignedMins min",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                val tbMins = room.timeBank / 60
+                val tbSign = if (room.timeBank > 0) "+" else if (room.timeBank < 0) "-" else ""
+                val tbColor = if (room.timeBank > 0) Color(0xFF2E7D32) else if (room.timeBank < 0) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
+                Text(
+                    text = "TimeBank: $tbSign${kotlin.math.abs(tbMins)} min",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = tbColor
                 )
             }
         }

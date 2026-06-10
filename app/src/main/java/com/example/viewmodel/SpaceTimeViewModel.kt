@@ -34,6 +34,75 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
     val isGenerating = MutableStateFlow(false)
     val errorMessage = MutableStateFlow<String?>(null)
 
+    // Global Timer State
+    var activeBlockId = MutableStateFlow(-1)
+    var timeRemainingSecs = MutableStateFlow(0)
+    var overtimeSecs = MutableStateFlow(0)
+    var isOvertime = MutableStateFlow(false)
+    var maxTimeSecs = MutableStateFlow(0)
+    var isTimerRunning = MutableStateFlow(false)
+    var lastTickTime = MutableStateFlow(0L)
+
+    private var timerJob: kotlinx.coroutines.Job? = null
+
+    var onTimerCompleteNotification: ((String, String) -> Unit)? = null
+
+    fun resetTimerState() {
+        isTimerRunning.value = false
+        timerJob?.cancel()
+        timerJob = null
+        timeRemainingSecs.value = 0
+        overtimeSecs.value = 0
+        isOvertime.value = false
+        maxTimeSecs.value = 0
+        activeBlockId.value = -1
+        lastTickTime.value = 0L
+    }
+
+    fun startTimer() {
+        if (!isTimerRunning.value) {
+            isTimerRunning.value = true
+            lastTickTime.value = System.currentTimeMillis()
+            timerJob = viewModelScope.launch(Dispatchers.Default) {
+                while (isTimerRunning.value) {
+                    kotlinx.coroutines.delay(500L)
+                    val currentNow = System.currentTimeMillis()
+                    val elapsed = (currentNow - lastTickTime.value) / 1000L
+                    if (elapsed > 0) {
+                        withContext(Dispatchers.Main) {
+                            if (!isOvertime.value) {
+                                timeRemainingSecs.value -= elapsed.toInt()
+                                if (timeRemainingSecs.value <= 0) {
+                                    val overThreshold = -timeRemainingSecs.value
+                                    timeRemainingSecs.value = 0
+                                    isOvertime.value = true
+                                    overtimeSecs.value = overThreshold
+                                    onTimerCompleteNotification?.invoke(
+                                        "Time's Up! Overtime Started",
+                                        "Assigned time has finished."
+                                    )
+                                }
+                            } else {
+                                overtimeSecs.value += elapsed.toInt()
+                            }
+                            lastTickTime.value += elapsed * 1000L
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun stopTimer() {
+        isTimerRunning.value = false
+        timerJob?.cancel()
+        timerJob = null
+    }
+
+    fun toggleTimer() {
+        if (isTimerRunning.value) stopTimer() else startTimer()
+    }
+
     fun createManualRoom(name: String, colorArgb: Long, iconName: String = "Star") {
         viewModelScope.launch(Dispatchers.IO) {
             val maxOrder = rooms.value.maxOfOrNull { it.orderIndex } ?: 0
@@ -197,6 +266,60 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
         }
     }
 
+    fun recordTaskCompletion(room: RoomEntity, block: TimeBlockEntity, timeTakenSecs: Int, overtimeSecs: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val assignedTimeSecs = block.durationMin * 60
+            val finalTimeTaken = if (timeTakenSecs > assignedTimeSecs) assignedTimeSecs else timeTakenSecs
+            val timeLeftSecs = maxOf(0, assignedTimeSecs - finalTimeTaken)
+            
+            val updatedBlock = block.copy(
+                isCompleted = !block.isCompleted,
+                assignedTime = assignedTimeSecs,
+                timeTaken = finalTimeTaken,
+                timeLeft = timeLeftSecs,
+                overtime = overtimeSecs,
+                completedAt = System.currentTimeMillis()
+            )
+            repository.updateTimeBlock(updatedBlock)
+            
+            if (updatedBlock.isCompleted) {
+                val updatedTotalTimeLeft = room.totalTimeLeft + timeLeftSecs
+                val updatedTotalOvertime = room.totalOvertime + overtimeSecs
+                val newTimeBank = updatedTotalTimeLeft - updatedTotalOvertime
+                
+                val updatedRoom = room.copy(
+                    totalTimeLeft = updatedTotalTimeLeft,
+                    totalOvertime = updatedTotalOvertime,
+                    timeBank = newTimeBank,
+                    totalSessionsCompleted = room.totalSessionsCompleted + 1
+                )
+                repository.updateRoom(updatedRoom)
+            } else {
+                // If they un-check it, we might want to revert, but let's keep it simple.
+            }
+        }
+    }
+
+    // For non-block tasks (manual sessions)
+    fun recordManualSessionCompletion(room: RoomEntity, assignedTimeSecs: Int, timeTakenSecs: Int, overtimeSecs: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val finalTimeTaken = if (timeTakenSecs > assignedTimeSecs) assignedTimeSecs else timeTakenSecs
+            val timeLeftSecs = maxOf(0, assignedTimeSecs - finalTimeTaken)
+            
+            val updatedTotalTimeLeft = room.totalTimeLeft + timeLeftSecs
+            val updatedTotalOvertime = room.totalOvertime + overtimeSecs
+            val newTimeBank = updatedTotalTimeLeft - updatedTotalOvertime
+            
+            val updatedRoom = room.copy(
+                totalTimeLeft = updatedTotalTimeLeft,
+                totalOvertime = updatedTotalOvertime,
+                timeBank = newTimeBank,
+                totalSessionsCompleted = room.totalSessionsCompleted + 1
+            )
+            repository.updateRoom(updatedRoom)
+        }
+    }
+    
     fun addBlock(roomId: Int, title: String, durationMin: Int, colorArgb: Long) {
         viewModelScope.launch(Dispatchers.IO) {
             val newBlock = TimeBlockEntity(
