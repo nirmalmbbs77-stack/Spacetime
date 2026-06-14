@@ -16,6 +16,9 @@ interface SpaceTimeDao {
     @Query("SELECT * FROM rooms WHERE roomId = :id")
     fun getRoomById(id: Int): Flow<RoomEntity?>
 
+    @Query("SELECT * FROM rooms WHERE roomId = :id")
+    suspend fun getRoomByIdOneShot(id: Int): RoomEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRoom(room: RoomEntity): Long
 

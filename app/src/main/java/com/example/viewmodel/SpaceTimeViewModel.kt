@@ -180,7 +180,7 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
 
     fun markRoomAsUsed(id: Int) {
         viewModelScope.launch(Dispatchers.IO) {
-            val room = repository.getRoomById(id).firstOrNull() ?: return@launch
+            val room = repository.getRoomByIdOneShot(id) ?: return@launch
             val updated = room.copy(lastUsedAt = System.currentTimeMillis())
             repository.updateRoom(updated)
         }
@@ -315,7 +315,8 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
                     totalTimeLeft = updatedTotalTimeLeft,
                     totalOvertime = updatedTotalOvertime,
                     timeBank = newTimeBank,
-                    totalSessionsCompleted = room.totalSessionsCompleted + 1
+                    totalSessionsCompleted = room.totalSessionsCompleted + 1,
+                    lastUsedAt = System.currentTimeMillis()
                 )
                 repository.updateRoom(updatedRoom)
             } else {
@@ -338,7 +339,8 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
                 totalTimeLeft = updatedTotalTimeLeft,
                 totalOvertime = updatedTotalOvertime,
                 timeBank = newTimeBank,
-                totalSessionsCompleted = room.totalSessionsCompleted + 1
+                totalSessionsCompleted = room.totalSessionsCompleted + 1,
+                lastUsedAt = System.currentTimeMillis()
             )
             repository.updateRoom(updatedRoom)
         }

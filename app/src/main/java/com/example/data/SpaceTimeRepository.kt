@@ -7,6 +7,8 @@ class SpaceTimeRepository(private val dao: SpaceTimeDao) {
 
     fun getRoomById(id: Int): Flow<RoomEntity?> = dao.getRoomById(id)
 
+    suspend fun getRoomByIdOneShot(id: Int): RoomEntity? = dao.getRoomByIdOneShot(id)
+
     suspend fun insertRoom(room: RoomEntity): Long = dao.insertRoom(room)
 
     suspend fun updateRoom(room: RoomEntity) = dao.updateRoom(room)

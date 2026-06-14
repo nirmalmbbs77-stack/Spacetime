@@ -63,6 +63,10 @@ fun RoomScreen(
     val room by viewModel.getRoom(roomId).collectAsStateWithLifecycle(initialValue = null)
     val timeBlocks by viewModel.getTimeBlocks(roomId).collectAsStateWithLifecycle(initialValue = emptyList())
 
+    LaunchedEffect(roomId) {
+        viewModel.markRoomAsUsed(roomId)
+    }
+
     if (room == null) {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
@@ -112,10 +116,6 @@ fun RoomScreen(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-    }
-
-    LaunchedEffect(roomId) {
-        viewModel.markRoomAsUsed(roomId)
     }
 
     LaunchedEffect(Unit) {
