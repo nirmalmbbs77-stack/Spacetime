@@ -125,7 +125,7 @@ dependencies {
 
 tasks.register<Copy>("copyApkForGithub") {
   from(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
-  into(rootDir.resolve(".build-output"))
+  into(rootDir.resolve("build-output"))
   rename { "apk-debug.apk" }
 }
 
