@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 import kotlinx.coroutines.withContext
@@ -176,6 +177,14 @@ class SpaceTimeViewModel(private val repository: SpaceTimeRepository) : ViewMode
 
     fun getRoom(id: Int) = repository.getRoomById(id)
     fun getTimeBlocks(id: Int) = repository.getTimeBlocksForRoom(id)
+
+    fun markRoomAsUsed(id: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val room = repository.getRoomById(id).firstOrNull() ?: return@launch
+            val updated = room.copy(lastUsedAt = System.currentTimeMillis())
+            repository.updateRoom(updated)
+        }
+    }
 
     fun createRoomFromText(prompt: String) {
         viewModelScope.launch(Dispatchers.IO) {

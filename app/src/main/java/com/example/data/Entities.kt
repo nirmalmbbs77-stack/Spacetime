@@ -19,7 +19,8 @@ data class RoomEntity(
     val orderIndex: Int = 0,
     val totalTimeLeft: Int = 0,
     val totalOvertime: Int = 0,
-    val timeBank: Int = 0
+    val timeBank: Int = 0,
+    val lastUsedAt: Long = 0L
 )
 
 @Entity(

@@ -31,12 +31,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.*
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -94,6 +96,7 @@ fun RoomScreen(
     var editBlockColor by remember { mutableStateOf(Color(0xFFFFFFFF)) }
     var showEditCustomBlockColorPicker by remember { mutableStateOf(false) }
     var isReorderMode by rememberSaveable { mutableStateOf(false) }
+    var isTimerFullScreen by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
@@ -109,6 +112,10 @@ fun RoomScreen(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    LaunchedEffect(roomId) {
+        viewModel.markRoomAsUsed(roomId)
     }
 
     LaunchedEffect(Unit) {
@@ -173,19 +180,88 @@ fun RoomScreen(
             )
         }
 
+        // Animate the glassmorphic ambient orbs in the room for a living Cosmic feel
+        val infiniteTransition = rememberInfiniteTransition(label = "ambient_glow_room")
+        val pulseAlpha1 by infiniteTransition.animateFloat(
+            initialValue = if (isDark) 0.08f else 0.05f,
+            targetValue = if (isDark) 0.20f else 0.12f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(6000, easing = EaseInOutSine),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulse_alpha_1"
+        )
+        val pulseAlpha2 by infiniteTransition.animateFloat(
+            initialValue = if (isDark) 0.05f else 0.03f,
+            targetValue = if (isDark) 0.15f else 0.09f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(9000, easing = EaseInOutSine),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "pulse_alpha_2"
+        )
+        val animOffsetX1 by infiniteTransition.animateFloat(
+            initialValue = 0.05f,
+            targetValue = 0.25f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(11000, easing = EaseInOutCubic),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "offset_x_1"
+        )
+        val animOffsetY1 by infiniteTransition.animateFloat(
+            initialValue = 0.15f,
+            targetValue = 0.35f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(14000, easing = EaseInOutCubic),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "offset_y_1"
+        )
+        val animOffsetX2 by infiniteTransition.animateFloat(
+            initialValue = 0.95f,
+            targetValue = 0.75f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(13000, easing = EaseInOutCubic),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "offset_x_2"
+        )
+        val animOffsetY2 by infiniteTransition.animateFloat(
+            initialValue = 0.65f,
+            targetValue = 0.85f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(10000, easing = EaseInOutCubic),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "offset_y_2"
+        )
+
         Box(modifier = Modifier.fillMaxSize().background(bgGradient)) {
-            // Ambient glowing gradient orbs in the background for real glassy reflection
-            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-                drawCircle(
-                    color = roomColor.copy(alpha = if (isDark) 0.12f else 0.08f),
-                    radius = size.width * 0.8f,
-                    center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.2f)
-                )
-                drawCircle(
-                    color = roomColor.copy(alpha = if (isDark) 0.08f else 0.06f),
-                    radius = size.width * 0.6f,
-                    center = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.7f)
-                )
+            // Immersive glassmorphic blur filter overlaying background drawing
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(80.dp)
+            ) {
+                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawCircle(
+                        color = roomColor.copy(alpha = pulseAlpha1),
+                        radius = size.width * 0.82f,
+                        center = androidx.compose.ui.geometry.Offset(
+                            size.width * animOffsetX1,
+                            size.height * animOffsetY1
+                        )
+                    )
+                    drawCircle(
+                        color = roomColor.copy(alpha = pulseAlpha2),
+                        radius = size.width * 0.62f,
+                        center = androidx.compose.ui.geometry.Offset(
+                            size.width * animOffsetX2,
+                            size.height * animOffsetY2
+                        )
+                    )
+                }
             }
 
             Column(
@@ -229,129 +305,124 @@ fun RoomScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Timer Section (Solid minimalist and thin stroke of Apple design)
+            // Timer Section (Translucent glassmorphic Apple design style with full-screen transition on tap)
+            val glassBgBrush = Brush.linearGradient(
+                colors = if (isDark) {
+                    listOf(roomColor.copy(alpha = 0.08f), Color(0x310D091A))
+                } else {
+                    listOf(roomColor.copy(alpha = 0.06f), Color(0x7FFFFFFF))
+                }
+            )
+            val glassBorderBrush = Brush.linearGradient(
+                colors = if (isDark) {
+                    listOf(Color.White.copy(alpha = 0.15f), roomColor.copy(alpha = 0.2f), Color.White.copy(alpha = 0.05f))
+                } else {
+                    listOf(Color.Black.copy(alpha = 0.08f), roomColor.copy(alpha = 0.15f), Color.Black.copy(alpha = 0.03f))
+                }
+            )
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.55f)
+                    .weight(0.58f)
                     .background(
-                        surfaceColor,
-                        RoundedCornerShape(32.dp)
+                        brush = glassBgBrush,
+                        shape = RoundedCornerShape(32.dp)
                     )
                     .border(
-                        1.dp,
-                        if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f),
-                        RoundedCornerShape(32.dp)
-                    ),
+                        width = 1.2.dp,
+                        brush = glassBorderBrush,
+                        shape = RoundedCornerShape(32.dp)
+                    )
+                    .clickable {
+                        isTimerFullScreen = true
+                    },
                 contentAlignment = Alignment.Center
             ) {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 56.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(top = 12.dp, start = 12.dp, end = 12.dp, bottom = 48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .aspectRatio(1f),
-                        contentAlignment = Alignment.Center
+                    val progress = if (maxTimeSecs == 0) 0f
+                       else timeRemainingSecs.toFloat() / maxTimeSecs.toFloat()
+
+                    val displayTime = if (isOvertime) overtimeSecs else timeRemainingSecs
+                    val displaySecs = displayTime % 60
+                    val displayMins = displayTime / 60
+                    val timeStr = String.format("%02d:%02d", displayMins, displaySecs)
+                    val activeLabel = activeBlock?.title ?: if (maxTimeSecs == 25 * 60) "Focus Session" else if (maxTimeSecs == 5 * 60) "Short Break" else if (maxTimeSecs == 15 * 60) "Long Break" else "Select a Block"
+
+                    // Stunning Celestial Clock Face
+                    CelestialTimerDial(
+                        progress = progress,
+                        roomColor = roomColor,
+                        displayTimeStr = if (isOvertime) "+$timeStr" else timeStr,
+                        label = activeLabel,
+                        isOvertime = isOvertime,
+                        isTimerRunning = isTimerRunning,
+                        modifier = Modifier.size(190.dp),
+                        onTimeClick = {
+                            if (!isOvertime) {
+                                customEditTimerMins = displayMins.toString()
+                                showEditTimerDialog = true 
+                            }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable(enabled = false) { } // prevent click propagation from entering full screen
                     ) {
-                        val progress = if (maxTimeSecs == 0) 0f
-                           else timeRemainingSecs.toFloat() / maxTimeSecs.toFloat()
-
-                        CircularProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier.fillMaxSize(0.75f),
-                            color = roomColor,
-                            trackColor = roomColor.copy(alpha = 0.1f),
-                            strokeWidth = 10.dp,
-                            strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
-                        )
-
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            val displayTime = if (isOvertime) overtimeSecs else timeRemainingSecs
-                            val displaySecs = displayTime % 60
-                            val displayMins = displayTime / 60
-                            val timeStr = String.format("%02d:%02d", displayMins, displaySecs)
-                            val textColor = if (isOvertime) Color.Red else MaterialTheme.colorScheme.onSurface
-                            val titleColor = if (isOvertime) Color.Red else roomColor
-
-                            Text(
-                                text = if (isOvertime) "+$timeStr" else timeStr,
-                                style = MaterialTheme.typography.displayLarge.copy(fontSize = 55.sp),
-                                color = textColor,
-                                maxLines = 1,
-                                softWrap = false,
-                                modifier = Modifier.clickable { 
-                                    if (!isOvertime) {
-                                        customEditTimerMins = displayMins.toString()
-                                        showEditTimerDialog = true 
-                                    }
+                        IconButton(
+                            onClick = {
+                                if (activeBlock != null || timeRemainingSecs > 0 || isOvertime) {
+                                    viewModel.toggleTimer()
                                 }
+                            },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(roomColor.copy(alpha = 0.2f), CircleShape)
+                        ) {
+                            Icon(
+                                if (isTimerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = "Play/Pause",
+                                tint = roomColor,
+                                modifier = Modifier.size(22.dp)
                             )
-                            if (isOvertime) {
-                                Text(
-                                    text = "OVERTIME",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 2.sp),
-                                    color = Color.Red
-                                )
-                            }
-                            Text(
-                                text = activeBlock?.title ?: if (maxTimeSecs == 25 * 60) "Focus Session" else if (maxTimeSecs == 5 * 60) "Short Break" else if (maxTimeSecs == 15 * 60) "Long Break" else "Select a Block",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = titleColor
+                        }
+                        
+                        IconButton(
+                            onClick = {
+                                if (activeBlock != null) {
+                                    val assignedSecs = activeBlock.durationMin * 60
+                                    val tLeft = if (!isOvertime) timeRemainingSecs else 0
+                                    val tTaken = assignedSecs - tLeft
+                                    val oTime = if (isOvertime) overtimeSecs else 0
+                                    viewModel.recordTaskCompletion(r, activeBlock, tTaken, oTime)
+                                } else if (maxTimeSecs > 0) {
+                                    val tLeft = if (!isOvertime) timeRemainingSecs else 0
+                                    val tTaken = maxTimeSecs - tLeft
+                                    val oTime = if (isOvertime) overtimeSecs else 0
+                                    viewModel.recordManualSessionCompletion(r, maxTimeSecs, tTaken, oTime)
+                                }
+                                viewModel.resetTimerState()
+                            },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(Color.Red.copy(alpha = 0.15f), CircleShape)
+                        ) {
+                            Icon(
+                                Icons.Filled.Stop,
+                                contentDescription = "Stop",
+                                tint = Color.Red,
+                                modifier = Modifier.size(22.dp)
                             )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                IconButton(
-                                    onClick = {
-                                        if (activeBlock != null || timeRemainingSecs > 0 || isOvertime) {
-                                            viewModel.toggleTimer()
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .size(64.dp)
-                                        .background(roomColor.copy(alpha = 0.2f), CircleShape)
-                                ) {
-                                    Icon(
-                                        if (isTimerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                        contentDescription = "Play/Pause",
-                                        tint = roomColor,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                }
-                                
-                                IconButton(
-                                    onClick = {
-                                        if (activeBlock != null) {
-                                            val assignedSecs = activeBlock.durationMin * 60
-                                            val tLeft = if (!isOvertime) timeRemainingSecs else 0
-                                            val tTaken = assignedSecs - tLeft
-                                            val oTime = if (isOvertime) overtimeSecs else 0
-                                            viewModel.recordTaskCompletion(r, activeBlock, tTaken, oTime)
-                                        } else if (maxTimeSecs > 0) {
-                                            val tLeft = if (!isOvertime) timeRemainingSecs else 0
-                                            val tTaken = maxTimeSecs - tLeft
-                                            val oTime = if (isOvertime) overtimeSecs else 0
-                                            viewModel.recordManualSessionCompletion(r, maxTimeSecs, tTaken, oTime)
-                                        }
-                                        viewModel.resetTimerState()
-                                    },
-                                    modifier = Modifier
-                                        .size(64.dp)
-                                        .background(Color.Red.copy(alpha = 0.15f), CircleShape)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.Stop,
-                                        contentDescription = "Stop Formally",
-                                        tint = Color.Red,
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                }
-                            }
                         }
                     }
                 }
@@ -361,7 +432,8 @@ fun RoomScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 8.dp)
+                        .padding(bottom = 6.dp)
+                        .clickable(enabled = false) { } // prevent click propagation to fullscreen
                 ) {
                     TextButton(onClick = {
                         viewModel.activeBlockId.value = -1
@@ -371,7 +443,7 @@ fun RoomScreen(
                         viewModel.isOvertime.value = false
                         viewModel.overtimeSecs.value = 0
                         viewModel.stopTimer()
-                    }) { Text("Focus", color = roomColor) }
+                    }) { Text("Focus", color = roomColor, style = MaterialTheme.typography.labelSmall) }
                     TextButton(onClick = {
                         viewModel.activeBlockId.value = -1
                         val duration = 5 * 60
@@ -380,7 +452,7 @@ fun RoomScreen(
                         viewModel.isOvertime.value = false
                         viewModel.overtimeSecs.value = 0
                         viewModel.stopTimer()
-                    }) { Text("Short Break", color = roomColor) }
+                    }) { Text("Short", color = roomColor, style = MaterialTheme.typography.labelSmall) }
                     TextButton(onClick = {
                         viewModel.activeBlockId.value = -1
                         val duration = 15 * 60
@@ -389,7 +461,7 @@ fun RoomScreen(
                         viewModel.isOvertime.value = false
                         viewModel.overtimeSecs.value = 0
                         viewModel.stopTimer()
-                    }) { Text("Long Break", color = roomColor) }
+                    }) { Text("Long", color = roomColor, style = MaterialTheme.typography.labelSmall) }
                 }
             }
 
@@ -523,14 +595,14 @@ fun RoomScreen(
                     )
                     
                     val cardBg = if (isCurrent) {
-                        roomColor.copy(alpha = if (isDark) 0.22f else 0.15f)
+                        roomColor.copy(alpha = if (isDark) 0.32f else 0.22f)
                     } else {
-                        if (isDark) Color(0xFF1E1E1E) else Color(0xFFF5F5F5)
+                        if (isDark) Color(0x2BFFFFFF) else Color(0xDFFFFFFF)
                     }
                     val cardBorder = if (isCurrent) {
-                        roomColor.copy(alpha = 0.5f)
+                        roomColor.copy(alpha = 0.7f)
                     } else {
-                        if (isDark) Color(0xFF2E2E2E) else Color(0xFFE5E5E5)
+                        if (isDark) Color(0x1FFFFFFF) else Color(0x1C000000)
                     }
 
                     Row(
@@ -723,6 +795,44 @@ fun RoomScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+        }
+
+        if (isTimerFullScreen) {
+            FullScreenTimerScreen(
+                roomName = r.name,
+                taskTitle = activeBlock?.title ?: if (maxTimeSecs == 25 * 60) "Focus Session" else if (maxTimeSecs == 5 * 60) "Short Break" else if (maxTimeSecs == 15 * 60) "Long Break" else "No Active Task",
+                roomColor = roomColor,
+                timeRemainingSecs = timeRemainingSecs,
+                maxTimeSecs = maxTimeSecs,
+                isOvertime = isOvertime,
+                overtimeSecs = overtimeSecs,
+                isTimerRunning = isTimerRunning,
+                isDark = isDark,
+                onToggleTimer = {
+                    if (activeBlock != null || timeRemainingSecs > 0 || isOvertime) {
+                        viewModel.toggleTimer()
+                    }
+                },
+                onResetTimer = {
+                    if (activeBlock != null) {
+                        val assignedSecs = activeBlock.durationMin * 60
+                        val tLeft = if (!isOvertime) timeRemainingSecs else 0
+                        val tTaken = assignedSecs - tLeft
+                        val oTime = if (isOvertime) overtimeSecs else 0
+                        viewModel.recordTaskCompletion(r, activeBlock, tTaken, oTime)
+                    } else if (maxTimeSecs > 0) {
+                        val tLeft = if (!isOvertime) timeRemainingSecs else 0
+                        val tTaken = maxTimeSecs - tLeft
+                        val oTime = if (isOvertime) overtimeSecs else 0
+                        viewModel.recordManualSessionCompletion(r, maxTimeSecs, tTaken, oTime)
+                    }
+                    viewModel.resetTimerState()
+                },
+                onDismiss = { isTimerFullScreen = false },
+                onUpdateRemainingTime = { newSecs ->
+                    viewModel.timeRemainingSecs.value = newSecs
+                }
+            )
         }
     }
     }
@@ -1011,5 +1121,440 @@ fun RoomScreen(
             onColorSelected = { editBlockColor = it },
             onDismiss = { showEditCustomBlockColorPicker = false }
         )
+    }
+}
+
+@Composable
+fun CelestialTimerDial(
+    progress: Float,
+    roomColor: Color,
+    displayTimeStr: String,
+    label: String,
+    isOvertime: Boolean,
+    isTimerRunning: Boolean,
+    modifier: Modifier = Modifier,
+    onTimeClick: () -> Unit = {}
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+            val centerOffset = this.center
+            val radius = this.size.minDimension / 2.0f - 20.dp.toPx()
+            
+            // Draw background clock ticks like an Apple sleep dial
+            val tickCount = 100
+            val activeTickCount = (progress * tickCount).toInt()
+            
+            for (i in 0 until tickCount) {
+                val angleRad = (i * (2.0 * kotlin.math.PI / tickCount)) - (kotlin.math.PI / 2.0)
+                val isThick = i % 10 == 0
+                val tickLength = if (isThick) 12.dp.toPx() else 6.dp.toPx()
+                val tickColor = if (i <= activeTickCount && progress > 0f) {
+                    roomColor.copy(alpha = 0.85f)
+                } else {
+                    roomColor.copy(alpha = 0.15f)
+                }
+                val strokeW = if (isThick) 2.2.dp.toPx() else 1.1.dp.toPx()
+                
+                val cosVal = kotlin.math.cos(angleRad).toFloat()
+                val sinVal = kotlin.math.sin(angleRad).toFloat()
+                
+                val startX = centerOffset.x + (radius - tickLength) * cosVal
+                val startY = centerOffset.y + (radius - tickLength) * sinVal
+                val endX = centerOffset.x + radius * cosVal
+                val endY = centerOffset.y + radius * sinVal
+                
+                drawLine(
+                    color = tickColor,
+                    start = androidx.compose.ui.geometry.Offset(startX, startY),
+                    end = androidx.compose.ui.geometry.Offset(endX, endY),
+                    strokeWidth = strokeW
+                )
+            }
+            
+            // Draw smooth glowing arc
+            drawArc(
+                color = roomColor.copy(alpha = 0.05f),
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 5.dp.toPx()),
+                size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
+                topLeft = androidx.compose.ui.geometry.Offset(centerOffset.x - radius, centerOffset.y - radius)
+            )
+            
+            drawArc(
+                color = roomColor,
+                startAngle = -90f,
+                sweepAngle = 360f * progress,
+                useCenter = false,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
+                topLeft = androidx.compose.ui.geometry.Offset(centerOffset.x - radius, centerOffset.y - radius)
+            )
+            
+            // Tip circle marker
+            val tipAngleRad = (-90f + 360f * progress) * (kotlin.math.PI / 180.0)
+            val tipX = centerOffset.x + radius * kotlin.math.cos(tipAngleRad).toFloat()
+            val tipY = centerOffset.y + radius * kotlin.math.sin(tipAngleRad).toFloat()
+            
+            drawCircle(
+                color = roomColor,
+                radius = 6.dp.toPx(),
+                center = androidx.compose.ui.geometry.Offset(tipX, tipY)
+            )
+            drawCircle(
+                color = Color.White,
+                radius = 2.5.dp.toPx(),
+                center = androidx.compose.ui.geometry.Offset(tipX, tipY)
+            )
+        }
+        
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(24.dp)
+        ) {
+            // Tiny status icon indicator
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .background(roomColor.copy(alpha = 0.15f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isOvertime) Icons.Filled.Stop else if (isTimerRunning) Icons.Filled.Check else Icons.Filled.PlayArrow,
+                    contentDescription = "Status",
+                    tint = roomColor,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Text(
+                text = if (isOvertime) "OVERTIME" else label.uppercase(),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp),
+                color = roomColor.copy(alpha = 0.7f),
+                maxLines = 1,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(1.dp))
+            
+            Text(
+                text = displayTimeStr,
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Light
+                ),
+                color = if (isOvertime) Color.Red else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.clickable { onTimeClick() }
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = "Active",
+                    tint = roomColor.copy(alpha = 0.5f),
+                    modifier = Modifier.size(10.dp)
+                )
+                Text(
+                    text = if (isTimerRunning) "Active" else "Paused",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FullScreenTimerScreen(
+    roomName: String,
+    taskTitle: String,
+    roomColor: Color,
+    timeRemainingSecs: Int,
+    maxTimeSecs: Int,
+    isOvertime: Boolean,
+    overtimeSecs: Int,
+    isTimerRunning: Boolean,
+    isDark: Boolean,
+    onToggleTimer: () -> Unit,
+    onResetTimer: () -> Unit,
+    onDismiss: () -> Unit,
+    onUpdateRemainingTime: (Int) -> Unit
+) {
+    val baseBg = if (isDark) Color(0xFF07050F) else Color(0xFFFAF6FF)
+    
+    // Colorful breathing atmospheric aura animations
+    val infiniteTransition = rememberInfiniteTransition(label = "fullscreen_aurora")
+    val scaleAnim by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(5000, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "aurora_scale"
+    )
+    val floatAnim by infiniteTransition.animateFloat(
+        initialValue = -15f,
+        targetValue = 15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(7000, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "aurora_float"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(baseBg)
+            .clickable { onDismiss() } // tap anywhere on the screen to minimize
+    ) {
+        // Soft glowing colored ambient orbs cloud / breathing aurora in background
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(90.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier
+                    .size(320.dp)
+                    .graphicsLayer {
+                        scaleX = scaleAnim
+                        scaleY = scaleAnim
+                        translationY = floatAnim
+                    }
+            ) {
+                val colorLeft = roomColor.copy(alpha = if (isDark) 0.5f else 0.35f)
+                val colorRight = if (isDark) Color(0xFFFF5252).copy(alpha = 0.4f) else Color(0xFFFF8A80).copy(alpha = 0.3f)
+                val colorBottom = if (isDark) Color(0xFF00E5FF).copy(alpha = 0.45f) else Color(0xFF84FFFF).copy(alpha = 0.3f)
+                val colorTop = if (isDark) Color(0xFFFFD400).copy(alpha = 0.35f) else Color(0xFFFFF59D).copy(alpha = 0.25f)
+                
+                val w = this.size.width
+                val h = this.size.height
+                
+                drawCircle(
+                    color = colorLeft,
+                    radius = w * 0.42f,
+                    center = androidx.compose.ui.geometry.Offset(w * 0.35f, h * 0.4f)
+                )
+                drawCircle(
+                    color = colorRight,
+                    radius = w * 0.38f,
+                    center = androidx.compose.ui.geometry.Offset(w * 0.65f, h * 0.45f)
+                )
+                drawCircle(
+                    color = colorBottom,
+                    radius = w * 0.45f,
+                    center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.7f)
+                )
+                drawCircle(
+                    color = colorTop,
+                    radius = w * 0.35f,
+                    center = androidx.compose.ui.geometry.Offset(w * 0.48f, h * 0.25f)
+                )
+            }
+        }
+
+        // Complete fullscreen task controls
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(vertical = 32.dp, horizontal = 24.dp)
+                .clickable(enabled = false) { }  // prevent background click from closing
+        ) {
+            // Header row with back icon
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.CenterStart)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Minimize Timer",
+                        tint = if (isDark) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.7f)
+                    )
+                }
+                
+                Text(
+                    text = if (taskTitle.isNotEmpty()) taskTitle else "Focus Session",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 0.5.sp,
+                        color = if (isDark) Color.White.copy(alpha = 0.9f) else Color.Black.copy(alpha = 0.85f)
+                    ),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(0.12f))
+
+            // Beautiful Celestial Dial centered on top of the soft halo
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.5f),
+                contentAlignment = Alignment.Center
+            ) {
+                CelestialTimerDial(
+                    progress = if (maxTimeSecs == 0) 0f else timeRemainingSecs.toFloat() / maxTimeSecs.toFloat(),
+                    roomColor = roomColor,
+                    displayTimeStr = run {
+                        val displayTime = if (isOvertime) overtimeSecs else timeRemainingSecs
+                        val displaySecs = displayTime % 60
+                        val displayMins = displayTime / 60
+                        val timeStr = String.format("%02d:%02d", displayMins, displaySecs)
+                        if (isOvertime) "+$timeStr" else timeStr
+                    },
+                    label = if (isOvertime) "OVERTIME" else if (isTimerRunning) "Focusing" else "Paused",
+                    isOvertime = isOvertime,
+                    isTimerRunning = isTimerRunning,
+                    modifier = Modifier.size(280.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(0.06f))
+
+            // Dynamic suggestions message
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val suggestionStr = if (isOvertime) {
+                    "Session complete! Time to wrap up or rest."
+                } else if (isTimerRunning) {
+                    if (taskTitle.lowercase().contains("break")) {
+                        "Rest and breathe, take your mind off things."
+                    } else {
+                        "Inhale deep focus, block out all secondary noise."
+                    }
+                } else {
+                    "Ready to begin? Tap play to start deep work."
+                }
+                
+                Text(
+                    text = suggestionStr,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Normal,
+                        color = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.6f)
+                    ),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Dynamic Progress Slider bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .padding(horizontal = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                val progress = if (maxTimeSecs == 0) 0f else timeRemainingSecs.toFloat() / maxTimeSecs.toFloat()
+                
+                Slider(
+                    value = progress,
+                    onValueChange = { newValue ->
+                        if (!isOvertime && maxTimeSecs > 0) {
+                            val computedSecs = (newValue * maxTimeSecs).toInt().coerceIn(0, maxTimeSecs)
+                            onUpdateRemainingTime(computedSecs)
+                        }
+                    },
+                    colors = SliderDefaults.colors(
+                        activeTrackColor = roomColor,
+                        inactiveTrackColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f),
+                        thumbColor = roomColor
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.weight(0.12f))
+
+            // Bottom controls: outlined circle of high quality playback
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onResetTimer,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f),
+                            shape = CircleShape
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Stop,
+                        contentDescription = "Stop",
+                        tint = Color.Red.copy(alpha = 0.8f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(36.dp))
+
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clickable { onToggleTimer() }
+                        .border(
+                            width = 1.5.dp,
+                            color = roomColor,
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isTimerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = "PlayPause",
+                        tint = roomColor,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(36.dp))
+
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f),
+                            shape = CircleShape
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowDown,
+                        contentDescription = "Minimize",
+                        tint = roomColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+        }
     }
 }
