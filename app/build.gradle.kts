@@ -122,3 +122,14 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+
+tasks.register<Copy>("copyApkForGithub") {
+  from(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
+  into(rootDir.resolve(".build-output"))
+  rename { "apk-debug.apk" }
+}
+
+tasks.matching { it.name == "assembleDebug" }.all {
+  finalizedBy("copyApkForGithub")
+}
+
