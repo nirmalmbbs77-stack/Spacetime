@@ -63,10 +63,6 @@ fun RoomScreen(
     val room by viewModel.getRoom(roomId).collectAsStateWithLifecycle(initialValue = null)
     val timeBlocks by viewModel.getTimeBlocks(roomId).collectAsStateWithLifecycle(initialValue = emptyList())
 
-    LaunchedEffect(roomId) {
-        viewModel.markRoomAsUsed(roomId)
-    }
-
     if (room == null) {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)

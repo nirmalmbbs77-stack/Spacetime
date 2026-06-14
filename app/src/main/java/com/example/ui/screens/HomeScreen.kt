@@ -289,7 +289,6 @@ fun HomeScreen(
                 when (selectedTab) {
                     0 -> {
                         // HOME VIEW (The Video Redesign)
-                        val featuredRoom = rooms.maxByOrNull { it.lastUsedAt } ?: rooms.firstOrNull()
                         LazyColumn(
                             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -307,6 +306,7 @@ fun HomeScreen(
                                     modifier = Modifier.padding(bottom = 12.dp)
                                 )
 
+                                val featuredRoom = rooms.firstOrNull()
                                 if (featuredRoom != null) {
                                     val fTimeBlocks by viewModel.getTimeBlocks(featuredRoom.roomId).collectAsStateWithLifecycle(emptyList())
                                     val totalMins = fTimeBlocks.sumOf { it.durationMin }
@@ -392,13 +392,7 @@ fun HomeScreen(
                             }
 
                             // Horizontal or Vertical List of Wide Cards matching "New Releases"
-                            val otherRooms = if (rooms.isNotEmpty() && featuredRoom != null) {
-                                rooms.filter { it.roomId != featuredRoom.roomId }
-                            } else if (rooms.isNotEmpty()) {
-                                rooms.drop(1)
-                            } else {
-                                emptyList()
-                            }
+                            val otherRooms = if (rooms.isNotEmpty()) rooms.drop(1) else emptyList()
                             if (otherRooms.isEmpty() && rooms.isNotEmpty()) {
                                 // If they only have one room, prompt to add another
                                 item {

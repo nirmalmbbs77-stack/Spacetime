@@ -1,2 +1,0 @@
-# Mark all APK files as binary to prevent Git from performing line-ending transformations (CRLF/LF) which corrupts the zip archive structure.
-*.apk binary
