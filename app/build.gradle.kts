@@ -9,12 +9,12 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk = 35
 
   defaultConfig {
     applicationId = "com.aistudio.spacetime.xza1qb"
     minSdk = 24
-    targetSdk = 36
+    targetSdk = 35
     versionCode = 1
     versionName = "1.0"
 
@@ -129,7 +129,13 @@ tasks.register<Copy>("copyApkForGithub") {
   rename { "apk-debug.apk" }
 }
 
+tasks.register<Copy>("copyApkForBuildOutputs") {
+  from(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
+  into(rootDir.resolve(".build-outputs"))
+  rename { "app-debug.apk" }
+}
+
 tasks.matching { it.name == "assembleDebug" }.all {
-  finalizedBy("copyApkForGithub")
+  finalizedBy("copyApkForGithub", "copyApkForBuildOutputs")
 }
 
