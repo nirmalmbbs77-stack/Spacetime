@@ -28,6 +28,17 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Prepare build environment (keystore and env files)
+        run: |
+          if [ -f debug.keystore.base64 ]; then
+            base64 --decode debug.keystore.base64 > debug.keystore
+            echo "Successfully decoded debug.keystore"
+          else
+            echo "Warning: debug.keystore.base64 not found!"
+          fi
+          touch .env
+          echo "Created empty .env file"
+
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
