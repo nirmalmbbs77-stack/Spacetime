@@ -1,0 +1,5 @@
+# Treat binaries correctly to prevent Git corruption
+*.jar binary
+*.png binary
+*.keystore binary
+*.apk binary
