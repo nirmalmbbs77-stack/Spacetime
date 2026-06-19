@@ -23,21 +23,10 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
+          cache: 'gradle'
 
-      - name: Delete Corrupt Wrapper
-        run: |
-          rm -f gradle/wrapper/gradle-wrapper.jar
-          echo "Deleted potentially corrupt gradle-wrapper.jar"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.3.1'
-
-      - name: Regenerate Clean Wrapper
-        run: |
-          gradle wrapper
-          chmod +x gradlew
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
       - name: Prepare build environment (keystore and env files)
         run: |
@@ -76,3 +65,4 @@ jobs:
           files: app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
