@@ -16,5 +16,4 @@
 local.properties
 .env
 debug.keystore
-/APK_DOWNLOAD/
 /.build-outputs/
